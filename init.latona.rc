@@ -1,26 +1,4 @@
 on early-init
-    insmod /lib/modules/fsr/fsr.ko
-    insmod /lib/modules/fsr_stl.ko
-    insmod /lib/modules/rfs_glue.ko
-    insmod /lib/modules/rfs_fat.ko
-
-    insmod /lib/modules/samsung_battery.ko
-
-    insmod /lib/modules/Si4709_driver.ko
-
-    insmod /lib/modules/yas_mag_kernel_driver.ko
-    insmod /lib/modules/yas_acc_kernel_driver.ko
-    insmod /lib/modules/yas_ori_kernel_driver.ko
-    insmod /lib/modules/gp2a/gp2a.ko
-    insmod /lib/modules/gps/gps.ko
-
-    insmod /lib/modules/storage.ko
-
-    insmod /lib/modules/mbcache.ko
-    insmod /lib/modules/jbd2/jbd2.ko
-    insmod /lib/modules/ext4/ext4.ko
-
-    insmod /lib/modules/vibetonz.ko
 
 on init
     export INTERNAL_STORAGE /mnt/sdcard
@@ -65,6 +43,22 @@ on fs
     mount debugfs debugfs /debug
 
 on post-fs
+
+# load kernel modules
+    insmod /system/lib/modules/btwilink.ko
+    insmod /system/lib/modules/cifs.ko
+    insmod /system/lib/modules/ecb.ko
+    insmod /system/lib/modules/gp2a.ko
+    insmod /system/lib/modules/gps.ko
+    insmod /system/lib/modules/pcbc.ko
+    insmod /system/lib/modules/samsung_battery.ko
+    insmod /system/lib/modules/scsi_wait_scan.ko
+    insmod /system/lib/modules/Si4709_driver.ko
+    insmod /system/lib/modules/st_drv.ko
+    insmod /system/lib/modules/vibetonz.ko
+    insmod /system/lib/modules/yas_acc_kernel_driver.ko
+    insmod /system/lib/modules/yas_mag_kernel_driver.ko
+    insmod /system/lib/modules/yas_ori_kernel_driver.ko
 
 # change permissions for alsa nodes
     symlink /dev/snd/pcmC0D0c /dev/pcmC0D0c
