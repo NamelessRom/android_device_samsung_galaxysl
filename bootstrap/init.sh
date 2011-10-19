@@ -6,11 +6,11 @@ busybox rm init
 busybox mount -t proc proc /proc
 busybox mount -t sysfs sysfs /sys
 
-RAMDISK=ramdisk.img
+RAMDISK=ramdisk.cpio.gz
 
 if busybox grep -q bootmode=2 /proc/cmdline ; then
 	# recovery boot
-    RAMDISK=ramdisk-recovery.img
+    RAMDISK=ramdisk-recovery.cpio.gz
 fi
 
 busybox gunzip -c ${RAMDISK} | busybox cpio -i
