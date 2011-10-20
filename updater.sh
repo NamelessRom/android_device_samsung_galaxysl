@@ -88,23 +88,11 @@ if ! /tmp/busybox mount -t ext4 /dev/block/mmcblk0p3  /data ; then
     /tmp/make_ext4fs -b 4096 -g 32768 -i 8192 -I 256 -a /data /dev/block/mmcblk0p3
 fi
 
-# restore efs backup
-#if /tmp/busybox test -e /sdcard/backup/efs/nv_data.bin ; then
-#    /tmp/busybox umount -l /efs
-#    /tmp/busybox mkdir -p /efs
-
-#    if ! /tmp/busybox grep -q /efs /proc/mounts ; then
-#        if ! /tmp/busybox mount -t ext4 /dev/block/stl3 /efs ; then
-#            /tmp/busybox echo "Cannot mount efs."
-#            exit 8
-#        fi
-#    fi
-
-#    /tmp/busybox cp -R /sdcard/backup/efs /
-#    /tmp/busybox umount -l /efs
-#else
-#    /tmp/busybox echo "Cannot restore efs."
-#    exit 9
-#fi
+# unmount everything
+/tmp/busybox umount -l /system
+/tmp/busybox umount -l /cache
+/tmp/busybox umount -l /data
+/tmp/busybox umount -l /dbdata
+/tmp/busybox umount -l /efs
 
 exit 0
