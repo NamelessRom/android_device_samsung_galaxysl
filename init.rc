@@ -9,7 +9,7 @@ loglevel 3
 
 # setup the global environment
     export PATH /sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
-    export LD_LIBRARY_PATH /lib:/vendor/lib:/system/lib
+    export LD_LIBRARY_PATH /vendor/lib:/system/lib
     export ANDROID_BOOTLOGO 1
     export ANDROID_CACHE /cache
     export ANDROID_ROOT /system
@@ -33,7 +33,6 @@ loglevel 3
 # create mountpoints
     mkdir /mnt 0775 root system
     mkdir /mnt/sdcard 0000 system system
-    mkdir /mnt/emmc 0000 system system
 
 # Create cgroup mount point for cpu accounting
     mkdir /acct
@@ -42,17 +41,11 @@ loglevel 3
 
 # Backwards Compat - XXX: Going away in G*
     symlink /mnt/sdcard /sdcard
-    symlink /mnt/emmc /emmc
 
     mkdir /system
-    mkdir /dbdata 0771 system system
     mkdir /data 0771 system system
     mkdir /cache 0771 system cache
     mkdir /config 0500 root root
-
-    mkdir /efs 0771 system system
-    chown system system /efs
-    chmod 0771 /efs
 
     # Directory for putting things only root should see.
     mkdir /mnt/secure 0700 root root
@@ -73,7 +66,6 @@ loglevel 3
     mount tmpfs tmpfs /mnt/obb mode=0755,gid=1000
 
     mkdir /sd-ext 0771 system system
-    mkdir /mnt/.lfs 0755 root root
 
     write /proc/sys/kernel/panic_on_oops 1
     write /proc/sys/kernel/hung_task_timeout_secs 0
@@ -102,119 +94,15 @@ loglevel 3
     # 5.0 %
     write /dev/cpuctl/bg_non_interactive/cpu.shares 52
 
-    insmod /lib/modules/fsr.ko
-    insmod /lib/modules/fsr_stl.ko
-    insmod /lib/modules/rfs_glue.ko
-    insmod /lib/modules/rfs_fat.ko
-    insmod /lib/modules/j4fs.ko
-
-    # parameter block
-    insmod /lib/modules/j4fs.ko
-    mkdir /mnt/.lfs 0755 root root
-    mount j4fs /dev/block/stl6 /mnt/.lfs
-    insmod /lib/modules/param.ko   
-
-    #temp
-    chown root root /sbin/fat.format
-    chmod 750 /sbin/fat.format
-
-# change permissions for bridge.  Symlink search directory
-    chown system system /dev/DspBridge
-    chmod 0660 /dev/DspBridge
-
-# change permissions for Camera
-    chown system camera /dev/video5
-    chown system camera /dev/video0
-    chmod 0660 /dev/video5
-    chmod 0660 /dev/video0
-
-# change permissions for Overlay
-    chown system system /dev/video1
-    chmod 0660 /dev/video1
-
-# change permissions for overlay managers and display devices
-    chmod 0777 /sys/devices/platform/omapdss/manager0/name
-    chmod 0777 /sys/devices/platform/omapdss/manager1/name
-
-    chmod 0777 /sys/devices/platform/omapdss/display0/name
-    chmod 0777 /sys/devices/platform/omapdss/display1/name
-
-    chmod 0777 /sys/devices/platform/omapdss/display0/enabled
-    chmod 0777 /sys/devices/platform/omapdss/display1/enabled
-
-    chmod 0777 /sys/devices/platform/omapdss/display1/timings
-    chmod 0777 /sys/devices/platform/omapdss/display0/timings
-
-    chmod 0777 /sys/devices/platform/omapdss/overlay0/manager
-    chmod 0777 /sys/devices/platform/omapdss/overlay1/manager
-    chmod 0777 /sys/devices/platform/omapdss/overlay2/manager
-
-    chmod 0777 /sys/devices/platform/omapdss/overlay0/enabled
-    chmod 0777 /sys/devices/platform/omapdss/overlay1/enabled
-    chmod 0777 /sys/devices/platform/omapdss/overlay2/enabled
-
-# change permissions for Previewer and Resizer
-    chown system system /dev/omap-previewer
-    chown system system /dev/omap-resizer
-    chmod 0660 /dev/omap-previewer
-    chmod 0660 /dev/omap-resizer
-
-    chown system system /dev/video6
-    chown system system /dev/video10
-    chmod 0660 /dev/video6
-    chmod 0660 /dev/video10
-
 on fs
-# mount ext4 partitions
-    mount ext4 /dev/block/stl9 /system noatime nodiratime errors=continue nobh data=writeback barrier=0 noauto_da_alloc 
+# mount mtd partitions
+    # Mount /system rw first to give the filesystem a chance to save a checkpoint
+    mount ext4 /dev/block/stl9 /system
     #mount ext4 /dev/block/stl9 /system ro remount
-
-# We chown/chmod /efs again so because mount is run as root + defaults
-    mount rfs /dev/block/stl3 /efs nosuid nodev check=no,iocharset=cp437
-
-# SEC_SECURITYLAB_LATONA_DEVICE_ENCRYPTION: efs permission, enable smc crypto driver and make secure storage
-# We chown/chmod /efs again so because mount is run as root + defaults
-    chown radio system /efs
-    chmod 0771 /efs
-
-    # SEC_DMCRYPT efs or cache or lfs partition required
-    exec apply_sec_devenc_init
-    
-    exec apply_disk_policy
-
-# SEC_SECURITYLAB_LATONA_DEVICE_EFNCRYPTION: add crypt option
-# We chown/chmod /data again so because mount is run as root + defaults
-    mount ext4 /dev/block/mmcblk0p3 /data nosuid nodev noatime nodiratime errors=continue nobh data=writeback barrier=0 noauto_da_alloc
-    chown system system /data
-    chmod 0771 /data
-
-# SEC_SECURITYLAB_LATONA_DEVICE_ENCRYPTION: add crypt option
-    mkdir /dbdata
-    mount ext4 /dev/block/stl10 /dbdata nosuid nodev noatime nodiratime errors=continue nobh data=writeback barrier=0 noauto_da_alloc 
-    chown system system /dbdata
-    chmod 0771 /dbdata
-
-    mkdir /dbdata/databases
-    chown system system /dbdata/databases
-    chmod 0777 /dbdata/databases
-
-    mkdir /dbdata/system
-    chown system system /dbdata/system
-    chmod 0775 /dbdata/system
-    mkdir /dbdata/db-journal
-    chown system system /dbdata/db-journal
-    chmod 0777 /dbdata/db-journal
 
 on post-fs
     # once everything is setup, no need to modify /
     # mount rootfs rootfs / ro remount
-
-    # additional kernel modules
-    insmod /system/lib/modules/mbcache.ko
-    insmod /system/lib/modules/jbd2.ko
-    insmod /system/lib/modules/Si4709_driver.ko
-    insmod /system/lib/modules/vibetonz.ko
-    insmod /system/lib/modules/bthid.ko
 
     # We chown/chmod /data again so because mount is run as root + defaults
     chown system system /data
@@ -247,23 +135,9 @@ on post-fs
     chown system cache /cache
     chmod 0771 /cache
 
-    # cache folder for bigger file than /cache
-    mkdir /data/cache
-    chown system cache /data/cache
-    chmod 0770 /data/cache
-
-# We chown/chmod /cache again so because mount is run as root + defaults
-    mount ext4 /dev/block/stl11 /cache nosuid nodev noatime nodiratime errors=continue nobh data=writeback barrier=0 noauto_da_alloc
-    chown system cache /cache
-    chmod 0771 /cache 
-
     # This may have been created by the recovery system with odd permissions
     chown system cache /cache/recovery
     chmod 0770 /cache/recovery
-
-#add for user can pull out recovery.log file by ADB CMD
-    chown system cache /cache/log
-    chmod 0771 /cache/log
 
     #change permissions on vmallocinfo so we can grab it from bugreports
     chown root log /proc/vmallocinfo
@@ -284,41 +158,18 @@ on post-fs
     mkdir /data/misc/systemkeys 0700 system system
     mkdir /data/misc/vpn/profiles 0770 system system
     # give system access to wpa_supplicant.conf for backup and restore
-    mkdir /data/wifi 0777 wifi wifi
-    mkdir /data/misc/wifi 0771 wifi system
-    chmod 0777 /data/misc/wifi/
-    chmod 0777 /data/wifi/
-    mkdir /data/misc/dhcp 0777 dhcp dhcp
-    mkdir /data/misc/wifi/sockets 0777 wifi wifi
-    # create softap for TI SoftAP. 2010/12/07 CHKIM   
-    mkdir /data/misc/softap 0770 wifi wifi
-    chmod 0664 /system/etc/wifi/wpa_supplicant.conf
-    chown dhcp dhcp /data/misc/dhcp
-    mkdir /data/misc/dhcpcd 0777 dhcp dhcp
-    chown dhcp dhcp /data/misc/dhcpcd
-    chown dhcp dhcp /data/misc/dhcp
+    mkdir /data/misc/wifi 0770 wifi wifi
+    chmod 0770 /data/misc/wifi
+    chmod 0660 /data/misc/wifi/wpa_supplicant.conf
     mkdir /data/local 0771 shell shell
     mkdir /data/local/tmp 0771 shell shell
+    mkdir /data/local/download 0771 system cache
     mkdir /data/data 0771 system system
     mkdir /data/app-private 0771 system system
     mkdir /data/app 0771 system system
     mkdir /data/property 0700 root root
 
     mkdir /cache/download 0771 system cache
-
-    #over-wirte-permission.
-    chmod 0771 /data/app
-    chown system system /data/app
-
-    # create log system
-    mkdir /data/log 0777 system system
-
-    chmod 0777 /data/log
-    chmod 0777 /data/anr
-    
-    chmod 0662 /dev/log/radio
-    chmod 0662 /dev/log/main
-    chmod 0662 /dev/log/event
 
     # create dalvik-cache and double-check the perms
     mkdir /data/dalvik-cache 0771 system system
@@ -343,122 +194,13 @@ on post-fs
     chown root net_raw /dev/socket
     chmod 0775 /dev/socket
 
-   # permissions for MTP device node_temporary permission_will be changed 0660
-    chmod 0660 /dev/usb_mtp_gadget 
-    chown system system /dev/usb_mtp_gadget
-    
-   # Permission for USB and UART path
-    chown system radio /sys/devices/platform/switch-sio/uart_sel
-    chown system radio /sys/devices/platform/switch-sio/usb_sel        
-    
-    # USB Device permission
-    chown system system /sys/devices/platform/android_usb/UsbMenuSel
-    chown system system /sys/devices/platform/android_usb/tethering    
-    chown system system /sys/devices/platform/i2c_omap.1/i2c-1/1-0048/twl4030_usb/vbus
-	
-#Added for CLMA certs for Manufacturing app in OMADRM Version2
-    mkdir /data/mrd 0744
-    mkdir /data/mrd/almc 0744
-    mkdir /data/mrd/almc/adabip 0744
-    chown radio radio /data/mrd/almc/adabip/
-    chmod 0744 /data/mrd/almc/adabip/
-	# Added for Playready DRM Support
-    mkdir /data/data/.drm 0775
-	chown media system /data/data/.drm
-    chmod 0775 /data/data/.drm
-	mkdir /data/data/.drm/.playready 0775
-	chown media system /data/data/.drm/.playready
-    chmod 0775 /data/data/.drm/.playready
-
-    chmod 0000 /system/etc/security/.drm
-    
-# DRM directory creation
-    # DivX DRM	
-    mkdir /efs/.files 0775
-    mkdir /efs/.files/.dx1 0775
-    mkdir /efs/.files/.dm33 0775
-    mkdir /efs/.files/.mp301 0775
-
-    chmod 0775 /efs/.files/.dx1
-    chmod 0775 /efs/.files/.dm33
-    chmod 0775 /efs/.files/.mp301
-
-#SISO-PLAYREADY-CHANGES
-	
-	# Setting device permissions for /dev/fmradio
-    chown system system /dev/fmradio
-    chmod 0660 /dev/fmradio
-
-# create data/gps for GPS demon
-    mkdir /data/gps 771 gps system
-    chown gps system /data/gps
-    chown gps root /sys/class/sec/gps/GPS_PWR_EN/value
-    chmod 660 /sys/class/sec/gps/GPS_PWR_EN/value
-
-# for sensor control
-    chown system input /sys/class/input/input0/enable
-    chown system input /sys/class/input/input0/delay
-    chown system input /sys/class/input/input0/wake
-    chown system input /sys/class/input/input0/data
-    
-    chown system input /sys/class/input/input1/enable
-    chown system input /sys/class/input/input1/delay
-    chown system input /sys/class/input/input1/wake
-    chown system input /sys/class/input/input1/threshold
-    chown system input /sys/class/input/input1/distortion
-    chown system input /sys/class/input/input1/shape
-    chown system input /sys/class/input/input1/offsets
-    chown system input /sys/class/input/input1/filter_enable
-    chown system input /sys/class/input/input1/filter_len
-    chown system input /sys/class/input/input1/data
-    chown system input /sys/class/input/input1/status
-    chown system input /sys/class/input/input1/position
-    
-    chown system input /sys/class/input/input2/enable
-    chown system input /sys/class/input/input2/delay
-    chown system input /sys/class/input/input2/wake
-    chown system input /sys/class/input/input2/threshold
-    chown system input /sys/class/input/input2/distortion
-    chown system input /sys/class/input/input2/shape
-    chown system input /sys/class/input/input2/offsets
-    chown system input /sys/class/input/input2/filter_enable
-    chown system input /sys/class/input/input2/filter_len
-    chown system input /sys/class/input/input2/data
-    chown system input /sys/class/input/input2/status
-    chown system input /sys/class/input/input2/position
-    
-    chown system input /sys/class/input/input3/enable
-    chown system input /sys/class/input/input3/delay
-    chown system input /sys/class/input/input3/wake
-    chown system input /sys/class/input/input3/threshold
-    chown system input /sys/class/input/input3/distortion
-    chown system input /sys/class/input/input3/shape
-    chown system input /sys/class/input/input3/offsets
-    chown system input /sys/class/input/input3/filter_enable
-    chown system input /sys/class/input/input3/filter_len
-    chown system input /sys/class/input/input3/data
-    chown system input /sys/class/input/input3/status
-    chown system input /sys/class/input/input3/position
-    
-    chown system input /sys/class/input/input4/enable
-    chown system input /sys/class/input/input4/delay
-    chown system input /sys/class/input/input4/wake
-    chown system input /sys/class/input/input5/enable
-    chown system input /sys/class/input/input5/delay
-    chown system input /sys/class/input/input5/wake
-    chown system input /sys/class/input/input6/enable
-    chown system input /sys/class/input/input6/delay
-    chown system input /sys/class/input/input6/wake
-    chown system input /sys/class/input/input7/enable
-    chown system input /sys/class/input/input7/delay
-    chown system input /sys/class/input/input7/wake
-    chown system input /sys/class/input/input8/enable
-    chown system input /sys/class/input/input8/delay
-    chown system input /sys/class/input/input8/wake
-    chown system input /sys/class/input/input9/enable
-    chown system input /sys/class/input/input9/delay
-    chown system input /sys/class/input/input9/wake
-    chown system input /dev/i2c-12
+    # allow system to modify cpufreq control files
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
 
 on boot
 # basic network init
@@ -473,39 +215,35 @@ on boot
 # killed by the kernel.  These are used in ActivityManagerService.
     setprop ro.FOREGROUND_APP_ADJ 0
     setprop ro.VISIBLE_APP_ADJ 1
-    setprop ro.PERCEPTIBLE_APP_ADJ 1
-    setprop ro.HEAVY_WEIGHT_APP_ADJ 2
-    setprop ro.SECONDARY_SERVER_ADJ 2
-    setprop ro.BACKUP_APP_ADJ 2
-    setprop ro.HOME_APP_ADJ 4
+    setprop ro.PERCEPTIBLE_APP_ADJ 2
+    setprop ro.HEAVY_WEIGHT_APP_ADJ 3
+    setprop ro.SECONDARY_SERVER_ADJ 4
+    setprop ro.BACKUP_APP_ADJ 5
+    setprop ro.HOME_APP_ADJ 6
     setprop ro.HIDDEN_APP_MIN_ADJ 7
-    setprop ro.CONTENT_PROVIDER_MEM 14
     setprop ro.EMPTY_APP_ADJ 15
 
 # Define the memory thresholds at which the above process classes will
 # be killed.  These numbers are in pages (4k).
-    setprop ro.FOREGROUND_APP_MEM 2560
-    setprop ro.VISIBLE_APP_MEM 4096
+    setprop ro.FOREGROUND_APP_MEM 2048
+    setprop ro.VISIBLE_APP_MEM 3072
     setprop ro.PERCEPTIBLE_APP_MEM 4096
     setprop ro.HEAVY_WEIGHT_APP_MEM 4096
     setprop ro.SECONDARY_SERVER_MEM 6144
     setprop ro.BACKUP_APP_MEM 6144
     setprop ro.HOME_APP_MEM 6144
-    setprop ro.HIDDEN_APP_MEM 10240
-    setprop ro.CONTENT_PROVIDER_MEM 11264
-    setprop ro.EMPTY_APP_MEM 12288
-
-    setprop wifi.interface "tiwlan0"
+    setprop ro.HIDDEN_APP_MEM 7168
+    setprop ro.EMPTY_APP_MEM 8192
 
 # Write value must be consistent with the above properties.
 # Note that the driver only supports 6 slots, so we have combined some of
 # the classes into the same memory level; the associated processes of higher
 # classes will still be killed first.
-    write /sys/module/lowmemorykiller/parameters/adj 0,1,2,7,14,15
+    write /sys/module/lowmemorykiller/parameters/adj 0,1,2,4,7,15
 
     write /proc/sys/vm/overcommit_memory 1
     write /proc/sys/vm/min_free_order_shift 4
-    write /sys/module/lowmemorykiller/parameters/minfree 2560,4096,6144,10240,11264,12288
+    write /sys/module/lowmemorykiller/parameters/minfree 2048,3072,4096,6144,7168,8192
 
     # Set init its forked children's oom_adj.
     write /proc/1/oom_adj -16
@@ -523,11 +261,9 @@ on boot
     chown radio system /sys/power/state
     chown radio system /sys/power/wake_lock
     chown radio system /sys/power/wake_unlock
-    chown radio system /sys/power/dvfslock_ctrl     
     chmod 0660 /sys/power/state
     chmod 0660 /sys/power/wake_lock
     chmod 0660 /sys/power/wake_unlock
-    chmod 0660 /sys/power/dvfslock_ctrl    		
     chown system system /sys/class/timed_output/vibrator/enable
     chown system system /sys/class/leds/keyboard-backlight/brightness
     chown system system /sys/class/leds/lcd-backlight/brightness
@@ -562,17 +298,12 @@ on boot
     setprop net.tcp.buffersize.umts    4094,87380,110208,4096,16384,110208
     setprop net.tcp.buffersize.edge    4093,26280,35040,4096,16384,35040
     setprop net.tcp.buffersize.gprs    4092,8760,11680,4096,8760,11680
-    setprop net.tcp.buffersize.hspa    4092,87380,262144,4096,16384,110208
 
 # Include extra init file
     import /system/etc/init.local.rc
 
 # Run sysinit
     exec /system/bin/sysinit
-
-# for datarouter
-    chown system system /dev/ttyGS0
-    chown system system /dev/dun
 
     class_start default
 
@@ -604,12 +335,6 @@ on property:persist.service.adb.enable=1
 on property:persist.service.adb.enable=0
     stop adbd
 
-# 3D init
-service pvrsrvinit /system/bin/pvrsrvinit
-    user root
-    group root
-    oneshot
-
 service servicemanager /system/bin/servicemanager
     user system
     critical
@@ -630,7 +355,7 @@ service ril-daemon /system/bin/rild
     socket rild stream 660 root radio
     socket rild-debug stream 660 radio system
     user root
-    group radio cache inet misc audio sdcard_rw net_admin net_raw log 
+    group radio cache inet misc audio sdcard_rw net_admin net_raw
 
 service zygote /system/bin/app_process -Xzygote /system/bin --zygote --start-system-server
     socket zygote stream 666
@@ -641,7 +366,7 @@ service zygote /system/bin/app_process -Xzygote /system/bin --zygote --start-sys
 
 service media /system/bin/mediaserver
     user media
-    group system audio camera graphics inet net_bt net_bt_admin net_raw radio
+    group system audio camera graphics inet net_bt net_bt_admin net_raw
     ioprio rt 4
 
 service bootanim /system/bin/bootanimation
@@ -649,66 +374,6 @@ service bootanim /system/bin/bootanimation
     group graphics
     disabled
     oneshot
-
-# wi-fi
-service dhcpcd_tiwlan0 /system/bin/dhcpcd -ABKL tiwlan0
-    disabled
-    oneshot
-
-service iprenew_tiwlan0 /system/bin/dhcpcd -n
-    disabled
-    oneshot
-
-service wpa_supplicant /system/bin/wpa_supplicant -Dtiwlan0 -itiwlan0 -c/data/misc/wifi/wpa_supplicant.conf -dd
-    socket wpa_tiwlan0 dgram 0660 wifi wifi
-    disabled
-    oneshot
-
-service mfgloader /system/bin/mfgloader
-    disabled
-    oneshot
-
-service wlandutservice /system/bin/wlandutservice
-    disabled
-    oneshot
-
-service wlan_loader /system/bin/tiwlan_loader -i /system/etc/wifi/tiwlan.ini -f /system/etc/wifi/firmware.bin -e /data/misc/wifi/nvs_map.bin
-    disabled
-    oneshot
-
-service wlan_plt_loader /system/bin/tiwlan_loader -i /system/etc/wifi/tiwlan_plt.ini -f /system/etc/wifi/firmware.bin -e /data/misc/wifi/nvs_map.bin
-    disabled
-    oneshot
-
-service ifcfg_tiwlan_up /system/bin/ifconfig tiwlan0 up
-    disabled
-    oneshot
-
-service tiwlan_plts /system/bin/tiwlan_plts
-    disabled
-    oneshot
-
-service tiwlan_nvs /system/bin/tiwlan_plts -n
-    disabled
-    oneshot
-
-service wlan_ap_loader /system/bin/tiap_loader -i /system/etc/wifi/softap/tiwlan_ap.ini -f /system/etc/wifi/softap/ap_firmware.bin -e /data/misc/wifi/nvs_map.bin
-    disabled
-    oneshot
-
-service hostapd /system/bin/hostapd -B -P /data/misc/softap/hostapd_pid.pid /data/misc/softap/hostapd_create.conf
-    disabled
-    oneshot
-
-service dhcpserver /system/bin/udhcpd_softap /system/etc/wifi/softap/udhcpd.conf
-    disabled
-    oneshot
-
-service ifcfg_tiap /system/bin/ifconfig tiap0 192.168.43.1 netmask 255.255.255.0
-    disabled
-    oneshot
-
-# end of Wifi
 
 service dbus /system/bin/dbus-daemon --system --nofork
     socket dbus stream 660 bluetooth bluetooth
@@ -722,15 +387,6 @@ service bluetoothd /system/bin/bluetoothd -n
     # let bluetoothd drop uid to bluetooth with the right linux capabilities
     group bluetooth net_bt_admin misc
     disabled
-
-# bluetooth mac address
-service bdaddr /system/bin/bdaddr_read
-    user root
-    disabled
-    oneshot
-
-on property:init.svc.bootanim=running
-    start bdaddr
 
 service hfag /system/bin/sdptool add --channel=10 HFAG
     user bluetooth
@@ -782,16 +438,3 @@ service dumpstate /system/bin/dumpstate -s
     socket dumpstate stream 0660 shell log
     disabled
     oneshot
-
-service orientationd /system/bin/orientationd
-    user compass
-    group input
-
-service geomagneticd /system/bin/geomagneticd
-    user compass
-    group system input
-    
-service gpsd /system/vendor/bin/gpsd -c /vendor/etc/gps.xml
-    socket gps seqpacket 0660 gps system
-    user gps
-    group system inet
