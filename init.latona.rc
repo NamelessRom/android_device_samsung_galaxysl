@@ -121,6 +121,7 @@ on fs
     mount ext4 /dev/block/stl11 /cache
     mount ext4 /dev/block/mmcblk0p3 /data
 
+    mkdir /dbdata 0771 system system
     mount ext4 /dev/block/stl10 /dbdata
     chown system system /dbdata
     chmod 0771 /dbdata
