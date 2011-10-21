@@ -7,11 +7,8 @@ TARGET_BOOTLOADER_BOARD_NAME := latona
 TARGET_CPU_ABI := armeabi-v7a
 TARGET_CPU_ABI2 := armeabi
 TARGET_ARCH_VARIANT := armv7-a-neon
-TARGET_ARCH_VARIANT_CPU := cortex-a8
-ANDROID_ARM_LINKER := true
 ARCH_ARM_HAVE_TLS_REGISTER := true
-TARGET_GLOBAL_CFLAGS += -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp
-TARGET_GLOBAL_CPPFLAGS += -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp
+
 TARGET_OMAP3 := true
 COMMON_GLOBAL_CFLAGS += -DTARGET_OMAP3
 
@@ -63,9 +60,9 @@ BOARD_EGL_CFG := device/samsung/galaxysl/egl.cfg
 
 # Audio
 BOARD_USES_GENERIC_AUDIO := false
-#BOARD_USES_ALSA_AUDIO := true
-#BUILD_WITH_ALSA_UTILS := true
-#ALSA_DEFAULT_SAMPLE_RATE := 44100
+BOARD_USES_ALSA_AUDIO := true
+BUILD_WITH_ALSA_UTILS := true
+#TARGET_PROVIDES_LIBAUDIO := true
 
 # Camera
 USE_CAMERA_STUB := false
@@ -91,7 +88,7 @@ endif
 # FM Radio
 BOARD_HAVE_FM_RADIO := true
 BOARD_GLOBAL_CFLAGS += -DHAVE_FM_RADIO
-BOARD_FM_DEVICE := wl1271
+BOARD_FM_DEVICE := si4709
 
 # Wifi related defines
 USES_TI_WL1271 := true
