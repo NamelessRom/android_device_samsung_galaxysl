@@ -1,5 +1,5 @@
-key 139   MENU              
-key 158   BACK              
+key 139   MENU              VIRTUAL
+key 158   BACK              VIRTUAL
 key 217   SEARCH     	    
 
 key 232   DPAD_CENTER       WAKE_DROPPED
