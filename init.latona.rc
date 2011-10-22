@@ -464,6 +464,11 @@ service hciattach /system/bin/brcm_patchram_plus --enable_hci --enable_lpm \
     disabled
     oneshot
 
+service immvibed /system/bin/immvibed
+    user shell
+    group system
+    oneshot
+
 # bugreport is triggered by holding down volume down, volume up and power
 service bugreport /system/bin/dumpstate -d -v -o /sdcard/bugreports/bugreport
     disabled
