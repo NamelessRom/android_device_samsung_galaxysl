@@ -142,6 +142,10 @@ on fs
 	chmod 0771 /efs/bluetooth
 	chmod 0771 /efs/imei
 
+    # Vibetonz
+    export TMPDIR /data/local/tmp
+    symlink /data/local/tmp /tmp
+
     # additional kernel modules
     insmod /system/lib/modules/samsung_battery.ko
     insmod /system/lib/modules/Si4709_driver.ko
