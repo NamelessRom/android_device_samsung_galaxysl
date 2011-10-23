@@ -124,7 +124,7 @@ PRODUCT_COPY_FILES += \
 # Packages
 PRODUCT_PACKAGES := \
     libcamera \
-    overlay.omap3 \
+    overlay.latona \
 	com.android.future.usb.accessory \
     bdaddr_read \
     utility_make_ext4fs \
