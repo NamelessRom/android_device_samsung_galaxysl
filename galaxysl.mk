@@ -123,10 +123,50 @@ PRODUCT_COPY_FILES += \
 
 # Packages
 PRODUCT_PACKAGES := \
+    libcamera \
+    overlay.omap3 \
 	com.android.future.usb.accessory \
     bdaddr_read \
     utility_make_ext4fs \
     bootmenu_busybox
+
+# OMX components
+PRODUCT_PACKAGES += \
+    libLCML \
+    libbridge \
+    cexec.out \
+    libOMX.ITTIAM.AAC.decode.so \
+    libOMX.ITTIAM.AAC.encode.so \
+    libOMX.TI.720P.Decoder.so \
+    libOMX.TI.720P.Encoder.so \
+    libOMX.TI.AAC.decode.so \
+    libOMX.TI.AAC.encode.so \
+    libOMX.TI.AMR.decode.so \
+    libOMX.TI.AMR.encode.so \
+    libOMX.TI.h264.splt.Encoder.so \
+    libOMX.TI.JPEG.decoder.so \
+    libOMX.TI.JPEG.encoder.so \
+    libOMX.TI.mp4.splt.Encoder.so \
+    libOMX.TI.MP3.decode.so \
+    libOMX.TI.Video.Decoder.so \
+    libOMX.TI.Video.encoder.so \
+    libOMX.TI.VPP.so \
+    libOMX.TI.WBAMR.decode.so \
+    libOMX.TI.WBAMR.encode.so \
+    libOMX.TI.WMA.decode.so \
+    libOMX_Core.so \
+
+# OpenMAX IL configuration
+TI_OMX_POLICY_MANAGER := hardware/ti/omx/system/src/openmax_il/omx_policy_manager
+PRODUCT_COPY_FILES += \
+    $(TI_OMX_POLICY_MANAGER)/src/policytable.tbl:system/etc/policytable.tbl \
+    $(LOCAL_PATH)/media_profiles.xml:system/etc/media_profiles.xml
+
+PRODUCT_PACKAGES += \
+    libomap_mm_library_jni
+
+FRAMEWORKS_BASE_SUBDIRS += \
+    $(addsuffix /java, omapmmlib )
 
 # The OpenGL ES API level that is natively supported by this device.
 # This is a 16.16 fixed point number
