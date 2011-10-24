@@ -41,17 +41,18 @@
 
 #else
 #define NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE    3
-#ifndef OVERLAY_NUM_REQBUFFERS
 #define NUM_OVERLAY_BUFFERS_REQUESTED  (6)
-#else
-#define NUM_OVERLAY_BUFFERS_REQUESTED  (OVERLAY_NUM_REQBUFFERS)
-#endif
 /* These values should come from Surface Flinger */
-#define LCD_WIDTH 800
-#define LCD_HEIGHT 480
+#define LCD_WIDTH 480
+#define LCD_HEIGHT 800  //baskar changed height & width
 #define TV_WIDTH 720
 #define TV_HEIGHT 480
+
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_05_24, for preventing overlay crash
 #define MAX_NUM_OVERLAYS 2
+//#define MAX_NUM_OVERLAYS 1
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_05_24, for preventing overlay crash
+
 #define NUM_OVERLAY_BUFFERS_MAX NUM_OVERLAY_BUFFERS_REQUESTED
 
 #endif

@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-//#define OVERLAY_DEBUG 1
+#define OVERLAY_DEBUG 1
 #define LOG_TAG "Overlay-V4L2"
 
 #include <fcntl.h>
@@ -88,7 +88,6 @@ int v4l2_overlay_open(int id)
     return open(v4l2_dev_name, O_RDWR);
 }
 
-#ifdef OVERLAY_DEBUG
 void dump_pixfmt(struct v4l2_pix_format *pix)
 {
     LOGI("w: %d\n", pix->width);
@@ -132,7 +131,6 @@ void dump_window(struct v4l2_window *win)
     LOGI("window w: %d ", win->w.width);
     LOGI("window h: %d\n", win->w.height);
 }
-
 void v4l2_overlay_dump_state(int fd)
 {
     struct v4l2_format format;
@@ -169,14 +167,13 @@ void v4l2_overlay_dump_state(int fd)
     dump_crop(&crop);
 */
 }
-#else
-#define v4l2_overlay_dump_state(x)
-#endif
 
 static void error(int fd, const char *msg)
 {
   LOGE("Error = %s from %s. errno = %d", strerror(errno), msg, errno);
+#ifdef OVERLAY_DEBUG
   v4l2_overlay_dump_state(fd);
+#endif
 }
 
 static int v4l2_overlay_ioctl(int fd, int req, void *arg, const char* msg)
@@ -329,8 +326,8 @@ int v4l2_overlay_set_position(int fd, int32_t x, int32_t y, int32_t w, int32_t h
     LOGV("v4l2_overlay_set_position:: w=%d h=%d", format.fmt.win.w.width, format.fmt.win.w.height);
 
     if (mRotateOverlay) {
-        w = 480;
-        h = 800;
+        w = 800;//480;  // chris-sdc
+        h = 480;//800;  // chris-sdc
         x = 0;
         y = 0;
     }
@@ -773,10 +770,14 @@ int v4l2_overlay_dq_buf(int fd, int *index, int memtype, void* buffer, size_t le
     p.events = POLLOUT;
 
     /* for now use 1/15s for timeout */
-    ret = poll(&p, 1, 67);
-    if (ret <= 0)
-        return ret ? -errno : -EIO;
+	ret = poll(&p, 1, 250);  // Tushar - OMAPS00245785 - [] - Changed it to 1/4s OR 4 FPS i.e. 250ms from 67ms
 
+    if (ret <= 0)
+    {
+	LOGE("ERROR:v4l2_overlay_dq_buf ret = %d, errno = %d", ret, errno);	//shinuk.lee_to_check_errorno
+        return ret ? -errno : -EIO;
+    }
+	
     buf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
     buf.memory = V4L2_MEMORY_MMAP;
     if (memtype == EMEMORY_USRPTR)
@@ -787,7 +788,10 @@ int v4l2_overlay_dq_buf(int fd, int *index, int memtype, void* buffer, size_t le
     }
     ret = v4l2_overlay_ioctl(fd, VIDIOC_DQBUF, &buf, "dqbuf");
     if (ret)
-      return errno;
+    {
+	LOGE("ERROR:v4l2_overlay_dq_buf ret = %d, errno = %d", ret, errno);	//shinuk.lee_to_check_errorno
+      	return errno;
+    }
     *index = buf.index;
     return 0;
 }
@@ -869,20 +873,6 @@ int v4l2_overlay_set_display_id(int fd, uint32_t id)
     ctrl.id = V4L2_CID_PRIVATE_DISPLAY_ID;
     ctrl.value = id;
     ret = v4l2_overlay_ioctl(fd, VIDIOC_S_CTRL, &ctrl, "set display ID");
-
-    return ret;
-}
-
-int v4l2_overlay_get_display_id(int fd, uint32_t *id)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_control ctrl;
-    memset(&ctrl, 0, sizeof(ctrl));
-    ctrl.value = -1;
-    ctrl.id = V4L2_CID_PRIVATE_DISPLAY_ID;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_G_CTRL, &ctrl, "get display ID");
-    *id = ctrl.value;
 
     return ret;
 }
