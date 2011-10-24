@@ -73,7 +73,7 @@ changeFramebufferColorMode(int color_mode) {
         changeFramebufferColorMode(color_mode)
 
 #else
-#define MAX_DISPLAY_CNT 3
+#define MAX_DISPLAY_CNT 1
 #define MAX_MANAGER_CNT 2
 #define PANEL_NAME_FOR_TV "tv"
 
