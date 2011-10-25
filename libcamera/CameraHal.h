@@ -90,7 +90,10 @@ extern "C" {
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-#define VIDEO_DEVICE        "/dev/video5"
+
+#define BACK_CAMERA_DEVICE    "/dev/video0"
+#define FRONT_CAMERA_DEVICE   "/dev/video5"
+
 #define MIN_WIDTH           128
 #define MIN_HEIGHT          96
 #define PICTURE_WIDTH   3264 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */

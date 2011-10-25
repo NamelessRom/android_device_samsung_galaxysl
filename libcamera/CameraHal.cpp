@@ -24,7 +24,7 @@
 *
 */
 
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define LOG_TAG "CameraHal"
 
 #include "CameraHal.h"
@@ -1242,7 +1242,7 @@ int CameraHal::CameraCreate()
 
     LOG_FUNCTION_NAME
 
-    camera_device = open(mCameraIndex ? "/dev/video0" : VIDEO_DEVICE, O_RDWR);
+    camera_device = open(mCameraIndex ? FRONT_CAMERA_DEVICE : BACK_CAMERA_DEVICE, O_RDWR);
     if (camera_device < 0) {
         LOGE ("Could not open the camera device: %s",  strerror(errno) );
         goto exit;
@@ -5115,7 +5115,7 @@ static const CameraInfo sCameraInfo[] = {
 #ifdef SECONDARY_CAMERA
     {
         CAMERA_FACING_FRONT,
-        270, /* orientation */
+        0, /* orientation */
     }
 #endif
 };

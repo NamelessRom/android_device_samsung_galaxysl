@@ -20,6 +20,7 @@
 
 #define OVERLAY_DEBUG 1
 #define LOG_TAG "Overlay-V4L2"
+#define LOG_NDEBUG 0
 
 #include <fcntl.h>
 #include <errno.h>
@@ -83,7 +84,7 @@ int v4l2_overlay_open(int id)
 {
     LOG_FUNCTION_NAME
     char v4l2_dev_name[PATH_MAX];
-    sprintf(v4l2_dev_name, "/dev/video%d", id + 1);
+    sprintf(v4l2_dev_name, OVERLAY_DEVICE);
     LOGI ("Openning %s\n", v4l2_dev_name);
     return open(v4l2_dev_name, O_RDWR);
 }

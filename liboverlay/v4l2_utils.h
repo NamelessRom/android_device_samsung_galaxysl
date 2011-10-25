@@ -23,6 +23,8 @@
 
 #include <linux/videodev.h>
 
+#define OVERLAY_DEVICE "/dev/video1"
+
 #define OVERLAY_FORMAT_ARGB_8888 100
 #define OVERLAY_FORMAT_ARGB_4444 200
 
