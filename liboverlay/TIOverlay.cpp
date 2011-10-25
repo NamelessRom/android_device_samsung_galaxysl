@@ -1227,12 +1227,12 @@ int overlay_control_context_t::overlay_setParameter(struct overlay_control_devic
             stage->mirror = false;
             break;
         case OVERLAY_TRANSFORM_FLIP_H:
-            stage->rotation = 180;
-            stage->mirror = true;
+            stage->rotation = 0;
+            stage->mirror = false;
             break;
         case OVERLAY_TRANSFORM_FLIP_V:
-            stage->rotation = 0;
-            stage->mirror = true;
+            stage->rotation = 180;
+            stage->mirror = false;
             break;
         case (HAL_TRANSFORM_FLIP_V | OVERLAY_TRANSFORM_ROT_90):
             stage->rotation = 90;
