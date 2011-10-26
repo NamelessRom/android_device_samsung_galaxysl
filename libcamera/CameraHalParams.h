@@ -78,9 +78,6 @@
 
 #define ROTATION_PHYSICAL       0
 #define ROTATION_EXIF           1
-#define COMPENSATION_MIN        -20
-#define COMPENSATION_MAX        20
-#define COMPENSATION_STEP       "0.1"
 #define CONTRAST_OFFSET         100
 #define BRIGHTNESS_OFFSET       100
 #define SATURATION_OFFSET       100

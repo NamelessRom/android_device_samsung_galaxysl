@@ -90,44 +90,72 @@ extern "C" {
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-
-#define BACK_CAMERA_DEVICE    "/dev/video0"
-#define FRONT_CAMERA_DEVICE   "/dev/video5"
-
-#define MIN_WIDTH           128
-#define MIN_HEIGHT          96
-#define PICTURE_WIDTH   3264 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
-#define PICTURE_HEIGHT  2448 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
-#define PREVIEW_WIDTH 176
-#define PREVIEW_HEIGHT 144
-#define CAPTURE_8MP_WIDTH        3280
-#define CAPTURE_8MP_HEIGHT       2464
-#define PIXEL_FORMAT           V4L2_PIX_FMT_UYVY
-#define LOG_FUNCTION_NAME    LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
-#define LOG_FUNCTION_NAME_EXIT    LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
+#define LOG_FUNCTION_NAME        LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
+#define LOG_FUNCTION_NAME_EXIT   LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
 #define VIDEO_FRAME_COUNT_MAX    NUM_OVERLAY_BUFFERS_REQUESTED
-#define MAX_CAMERA_BUFFERS    NUM_OVERLAY_BUFFERS_REQUESTED
-#define COMPENSATION_OFFSET 20
-#define CONTRAST_OFFSET 100
-#define BRIGHTNESS_OFFSET 100
-#define STRINGIZE_(x) #x
-#define STRINGIZE(x) STRINGIZE_(x)
-#define DEFAULT_THUMB_WIDTH     320
-#define DEFAULT_THUMB_HEIGHT    240
-#define MAX_THUMB_WIDTH     512
-#define MAX_THUMB_HEIGHT    384
-#define MIN_THUMB_WIDTH    80
-#define MIN_THUMB_HEIGHT   60
-#define IMX046_FOCALLENGTH 4.68
-#define IMX046_HORZANGLE 62.9
-#define IMX046_VERTANGLE 24.8
-#define MIN_FPS 8
-#define MAX_FPS 30
-#define FOCUS_DISTANCE_NEAR 0.500000
-#define FOCUS_DISTANCE_OPTIMAL 1.500000
-#define FOCUS_DISTANCE_BUFFER_SIZE  30
+#define MAX_CAMERA_BUFFERS       NUM_OVERLAY_BUFFERS_REQUESTED
+#define STRINGIZE_(x)            #x
+#define STRINGIZE(x)             STRINGIZE_(x)
+
+// COMMON
+#define PREVIEW_WIDTH                 640
+#define PREVIEW_HEIGHT                480
+#define CAPTURE_8MP_WIDTH             3280
+#define CAPTURE_8MP_HEIGHT            2464
+#define PIXEL_FORMAT                  V4L2_PIX_FMT_UYVY
+#define MIN_THUMB_WIDTH               160
+#define MIN_THUMB_HEIGHT              120
+#define COMPENSATION_OFFSET           20
+#define CONTRAST_OFFSET               100
+#define BRIGHTNESS_OFFSET             100
+#define MIN_FPS                       7
+#define MAX_FPS                       30
+#define FOCUS_DISTANCE_BUFFER_SIZE    30
 #define MANUAL_FOCUS_DEFAULT_POSITION 50
 
+// CE147 - BACK CAMERA
+#define BACK_CAMERA_DEVICE                  "/dev/video0"
+#define BACK_CAMERA_MAX_THUMB_WIDTH         160
+#define BACK_CAMERA_MAX_THUMB_HEIGHT        120
+#define BACK_CAMERA_DEFAULT_THUMB_WIDTH     160
+#define BACK_CAMERA_DEFAULT_THUMB_HEIGHT    120
+#define BACK_CAMERA_THUMB_QUALITY           100
+#define BACK_CAMERA_FOCALLENGTH             3.79
+#define BACK_CAMERA_HORZANGLE               51.2
+#define BACK_CAMERA_VERTANGLE               39.4
+#define BACK_CAMERA_COMPENSATION_MIN        -4
+#define BACK_CAMERA_COMPENSATION_MAX        4
+#define BACK_CAMERA_COMPENSATION_STEP       "0.5"
+#define BACK_CAMERA_PICTURE_WIDTH           2560 
+#define BACK_CAMERA_PICTURE_HEIGHT          1920
+#define BACK_CAMERA_MIN_PREVIEW_WIDTH       352
+#define BACK_CAMERA_MIN_PREVIEW_HEIGHT      288
+#define BACK_CAMERA_FOCUS_DISTANCE_NEAR     0.100000
+#define BACK_CAMERA_FOCUS_DISTANCE_OPTIMAL  1.200000
+#define BACK_CAMERA_ROTATION                0
+
+// S5KA3DFX - FRONT CAMERA
+#define FRONT_CAMERA_DEVICE                  "/dev/video5"
+#define FRONT_CAMERA_MAX_THUMB_WIDTH         160
+#define FRONT_CAMERA_MAX_THUMB_HEIGHT        120
+#define FRONT_CAMERA_DEFAULT_THUMB_WIDTH     160
+#define FRONT_CAMERA_DEFAULT_THUMB_HEIGHT    120
+#define FRONT_CAMERA_THUMB_QUALITY           100
+#define FRONT_CAMERA_FOCALLENGTH             0.9 
+#define FRONT_CAMERA_HORZANGLE               51.2
+#define FRONT_CAMERA_VERTANGLE               39.4
+#define FRONT_CAMERA_COMPENSATION_MIN        -4
+#define FRONT_CAMERA_COMPENSATION_MAX        4
+#define FRONT_CAMERA_COMPENSATION_STEP       "0.5"
+#define FRONT_CAMERA_PICTURE_WIDTH           640
+#define FRONT_CAMERA_PICTURE_HEIGHT          480
+#define FRONT_CAMERA_MIN_PREVIEW_WIDTH       176
+#define FRONT_CAMERA_MIN_PREVIEW_HEIGHT      144
+#define FRONT_CAMERA_FOCUS_DISTANCE_NEAR     0.200000
+#define FRONT_CAMERA_FOCUS_DISTANCE_OPTIMAL  0.250000
+#define FRONT_CAMERA_ROTATION                0
+
+// MISC
 #define ZOOM_SCALE (1<<16)
 
 #define PIX_YUV422I 0
@@ -600,6 +628,8 @@ public:
     static const char supportedPreviewSizesSecondary[];
     static const char supportedFPS[];
     static const char supportedFpsRanges[];
+    static const char supportedFPSSecondary[];
+    static const char supportedFpsRangesSecondary[];
     static const char supportedThumbnailSizes[];
     char focusDistances[FOCUS_DISTANCE_BUFFER_SIZE];
     static const char PARAMS_DELIMITER[];

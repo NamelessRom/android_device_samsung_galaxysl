@@ -69,27 +69,32 @@ typedef struct {
 
 int CameraHal::camera_device = 0;
 wp<CameraHardwareInterface> CameraHal::singleton[];
-const char CameraHal::supportedPictureSizes [] = "3264x2448,2560x2048,2048x1536,1600x1200,1280x1024,1152x968,1280x960,800x600,640x480,320x240";
-const char CameraHal::supportedPictureSizesSecondary [] = "640x480";
-const char CameraHal::supportedPreviewSizes [] = "1280x720,992x560,864x480,800x480,720x576,720x480,768x576,640x480,320x240,352x288,240x160,176x144,128x96";
-const char CameraHal::supportedPreviewSizesSecondary [] = "800x480,720x576,720x480,768x576,640x480,320x240,352x288,240x160,176x144,128x96";
-const char CameraHal::supportedFPS [] = "33,30,25,24,20,15,10";
-const char CameraHal::supportedThumbnailSizes []= "320x240,80x60,0x0";
-const char CameraHal::supportedFpsRanges [] = "(8000,8000),(8000,10000),(10000,10000),(8000,15000),(15000,15000),(8000,20000),(20000,20000),(24000,24000),(25000,25000),(8000,30000),(30000,30000)";
+
+/* BACK CAMERA */
+const char CameraHal::supportedPictureSizes [] = "2560x1920,2560x1536,2048x1536,2048x1232,1600x1200,1600x960,800x480,640x480";
+const char CameraHal::supportedPreviewSizes [] = "1280x720,800x480,720x480,640x480,592x480,352x288";
+const char CameraHal::supportedFPS [] = "30,20,15,10,7";
+const char CameraHal::supportedFpsRanges [] = "(7000,30000)";
+
+/* FRONT CAMERA */
+const char CameraHal::supportedPictureSizesSecondary [] = "640x480,320x240,176x144";
+const char CameraHal::supportedPreviewSizesSecondary [] = "640x480,320x240,176x144";
+const char CameraHal::supportedFPSSecondary [] = "15,10,7";
+const char CameraHal::supportedFpsRangesSecondary [] = "(7500,30000)";
+
+/* COMMON */
+const char CameraHal::supportedThumbnailSizes []= "160x120,0x0";
+
 const char CameraHal::PARAMS_DELIMITER []= ",";
 
-const supported_resolution CameraHal::supportedPictureRes[] = { {3264, 2448} , {2560, 2048} ,
-                                                     {2048, 1536} , {1600, 1200} ,
-                                                     {1280, 1024} , {1152, 968} ,
-                                                     {1280, 960} , {800, 600},
-                                                     {640, 480}   , {320, 240} };
+const supported_resolution CameraHal::supportedPictureRes[] = { {2560, 1920}, {2560, 1536},
+                                                     {2048, 1536}, {2048, 1232}, {1600, 1200}, 
+                                                     {1600, 960}, {800, 480}, {640, 480},
+                                                     {320, 240}, {176, 144} };
 
 const supported_resolution CameraHal::supportedPreviewRes[] = { {1280, 720}, {800, 480},
-                                                     {720, 576}, {720, 480},
-                                                     {992, 560}, {864, 480}, {848, 480},
-                                                     {768, 576}, {640, 480},
-                                                     {320, 240}, {352, 288}, {240, 160},
-                                                     {176, 144}, {128, 96}};
+                                                     {720, 480}, {640, 480}, {592, 480}, 
+                                                     {352, 288}, {320, 240}, {176, 144}, };
 
 int camerahal_strcat(char *dst, const char *src, size_t size)
 {
@@ -344,24 +349,33 @@ void CameraHal::initDefaultParameters()
 
     LOG_FUNCTION_NAME
 
-    p.setPreviewSize(MIN_WIDTH, MIN_HEIGHT);
-
     //We must initialize both framerate and fps range.
     //Application will decide which to use.
     //If application does not decide, framerate will be used in CameraHAL
     char fpsRange[32];
-    sprintf(fpsRange, "%d,%d", 30000, 30000);
-    p.set(KEY_PREVIEW_FPS_RANGE, fpsRange);
-    p.setPreviewFrameRate(30);
+
+    if ( mCameraIndex == 0) 
+    {
+        p.setPreviewSize(BACK_CAMERA_MIN_PREVIEW_WIDTH, BACK_CAMERA_MIN_PREVIEW_HEIGHT);
+        sprintf(fpsRange, "%d,%d", 7000, 30000);
+        p.set(KEY_PREVIEW_FPS_RANGE, fpsRange);
+        p.setPreviewFrameRate(30);
+        p.setPictureSize(BACK_CAMERA_PICTURE_WIDTH, BACK_CAMERA_PICTURE_HEIGHT);
+    }
+    else
+    {
+        p.setPreviewSize(FRONT_CAMERA_MIN_PREVIEW_WIDTH, FRONT_CAMERA_MIN_PREVIEW_HEIGHT);
+        sprintf(fpsRange, "%d,%d", 7500, 30000);
+        p.set(KEY_PREVIEW_FPS_RANGE, fpsRange);
+        p.setPreviewFrameRate(15);
+        p.setPictureSize(FRONT_CAMERA_PICTURE_WIDTH, FRONT_CAMERA_PICTURE_HEIGHT);
+    }
 
     p.setPreviewFormat(CameraParameters::PIXEL_FORMAT_YUV422I);
-
-    p.setPictureSize(PICTURE_WIDTH, PICTURE_HEIGHT);
     p.setPictureFormat(CameraParameters::PIXEL_FORMAT_JPEG);
     p.set(CameraParameters::KEY_JPEG_QUALITY, 100);
 
     //extended parameters
-
     memset(tmpBuffer, '\0', PARAM_BUFFER);
     for ( int i = 0 ; i < ZOOM_STAGES ; i++ ) {
         zoomStage =  (unsigned int ) ( zoom_step[i]*PARM_ZOOM_SCALE );
@@ -371,30 +385,30 @@ void CameraHal::initDefaultParameters()
         if(camerahal_strcat((char*) tmpBuffer, (const char*) PARAMS_DELIMITER, PARAM_BUFFER)) return;
     }
     p.set(CameraParameters::KEY_ZOOM_RATIOS, tmpBuffer);
-    p.set(CameraParameters::KEY_ZOOM_SUPPORTED, "true");
-    p.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED, "true");
+    p.set(CameraParameters::KEY_ZOOM_SUPPORTED, mCameraIndex ? "false" : "true");
+    p.set(CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED, mCameraIndex ? "false" : "true");
     // zoom goes from 0..MAX_ZOOM so send array size minus one
     p.set(CameraParameters::KEY_MAX_ZOOM, ZOOM_STAGES-1);
     p.set(CameraParameters::KEY_ZOOM, 0);
 
-    p.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION, COMPENSATION_MAX);
-    p.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION, COMPENSATION_MIN);
-    p.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP, COMPENSATION_STEP);
+    p.set(CameraParameters::KEY_MAX_EXPOSURE_COMPENSATION, mCameraIndex ? FRONT_CAMERA_COMPENSATION_MAX : BACK_CAMERA_COMPENSATION_MAX);
+    p.set(CameraParameters::KEY_MIN_EXPOSURE_COMPENSATION, mCameraIndex ? FRONT_CAMERA_COMPENSATION_MIN : BACK_CAMERA_COMPENSATION_MIN);
+    p.set(CameraParameters::KEY_EXPOSURE_COMPENSATION_STEP, mCameraIndex ? FRONT_CAMERA_COMPENSATION_STEP : BACK_CAMERA_COMPENSATION_STEP);
     p.set(CameraParameters::KEY_EXPOSURE_COMPENSATION, 0);
 
     p.set(CameraParameters::KEY_SUPPORTED_PICTURE_SIZES, mCameraIndex ? CameraHal::supportedPictureSizesSecondary : CameraHal::supportedPictureSizes);
-    p.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE, CameraHal::supportedFpsRanges);
+    p.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FPS_RANGE, mCameraIndex ? CameraHal::supportedFpsRangesSecondary : CameraHal::supportedFpsRanges);
     p.set(CameraParameters::KEY_SUPPORTED_PICTURE_FORMATS, CameraParameters::PIXEL_FORMAT_JPEG);
     p.set(CameraParameters::KEY_SUPPORTED_PREVIEW_SIZES, mCameraIndex ? CameraHal::supportedPreviewSizesSecondary : CameraHal::supportedPreviewSizes);
     p.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FORMATS, CameraParameters::PIXEL_FORMAT_YUV422I);
-    p.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES, CameraHal::supportedFPS);
+    p.set(CameraParameters::KEY_SUPPORTED_PREVIEW_FRAME_RATES, mCameraIndex ? CameraHal::supportedFPSSecondary : CameraHal::supportedFPS);
     p.set(CameraParameters::KEY_SUPPORTED_JPEG_THUMBNAIL_SIZES, CameraHal::supportedThumbnailSizes);
-    p.set(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, STRINGIZE(DEFAULT_THUMB_WIDTH));
-    p.set(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, STRINGIZE(DEFAULT_THUMB_HEIGHT));
 
-    p.set(CameraParameters::KEY_FOCAL_LENGTH, STRINGIZE(IMX046_FOCALLENGTH));
-    p.set(CameraParameters::KEY_HORIZONTAL_VIEW_ANGLE, STRINGIZE(IMX046_HORZANGLE));
-    p.set(CameraParameters::KEY_VERTICAL_VIEW_ANGLE, STRINGIZE(IMX046_VERTANGLE));
+    p.set(CameraParameters::KEY_JPEG_THUMBNAIL_WIDTH, mCameraIndex ? STRINGIZE(FRONT_CAMERA_DEFAULT_THUMB_WIDTH) : STRINGIZE(BACK_CAMERA_DEFAULT_THUMB_WIDTH));
+    p.set(CameraParameters::KEY_JPEG_THUMBNAIL_HEIGHT, mCameraIndex ? STRINGIZE(FRONT_CAMERA_DEFAULT_THUMB_HEIGHT) : STRINGIZE(BACK_CAMERA_DEFAULT_THUMB_HEIGHT));
+    p.set(CameraParameters::KEY_FOCAL_LENGTH, mCameraIndex ? STRINGIZE(FRONT_CAMERA_FOCALLENGTH) : STRINGIZE(BACK_CAMERA_FOCALLENGTH));
+    p.set(CameraParameters::KEY_HORIZONTAL_VIEW_ANGLE, mCameraIndex ? STRINGIZE(FRONT_CAMERA_HORZANGLE) : STRINGIZE(BACK_CAMERA_HORZANGLE));
+    p.set(CameraParameters::KEY_VERTICAL_VIEW_ANGLE, mCameraIndex ? STRINGIZE(FRONT_CAMERA_VERTANGLE) : STRINGIZE(BACK_CAMERA_VERTANGLE));
 
     memset(tmpBuffer, '\0', PARAM_BUFFER);
     if(camerahal_strcat((char*) tmpBuffer, (const char*) CameraParameters::WHITE_BALANCE_AUTO, PARAM_BUFFER)) return;
@@ -477,16 +491,24 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_SUPPORTED_ANTIBANDING, tmpBuffer);
     p.set(CameraParameters::KEY_ANTIBANDING, CameraParameters::ANTIBANDING_OFF);
 
-    p.set(CameraParameters::KEY_ROTATION, 0);
+    p.set(CameraParameters::KEY_ROTATION, mCameraIndex ? STRINGIZE(FRONT_CAMERA_ROTATION) : STRINGIZE(BACK_CAMERA_ROTATION));
     p.set(KEY_ROTATION_TYPE, ROTATION_PHYSICAL);
+
     //set the video frame format needed by video capture framework
     p.set(CameraParameters::KEY_VIDEO_FRAME_FORMAT, CameraParameters::PIXEL_FORMAT_YUV422I);
 
-    //Set focus distances near=0.5, optimal=1.5, far="Infinity"
-    //Once when fw3A supports focus distances, update them in CameraHal::GetParameters()
-    sprintf(CameraHal::focusDistances, "%f,%f,%s", FOCUS_DISTANCE_NEAR, FOCUS_DISTANCE_OPTIMAL, CameraParameters::FOCUS_DISTANCE_INFINITY);
+    //Set focus distances
+    if ( mCameraIndex == 0 )
+    {
+        sprintf(CameraHal::focusDistances, "%f,%f,%s", BACK_CAMERA_FOCUS_DISTANCE_NEAR, BACK_CAMERA_FOCUS_DISTANCE_OPTIMAL, CameraParameters::FOCUS_DISTANCE_INFINITY);
+    }
+    else
+    {
+        sprintf(CameraHal::focusDistances, "%f,%f,%s", FRONT_CAMERA_FOCUS_DISTANCE_NEAR, FRONT_CAMERA_FOCUS_DISTANCE_OPTIMAL, CameraParameters::FOCUS_DISTANCE_INFINITY);
+    }
     p.set(CameraParameters::KEY_FOCUS_DISTANCES, CameraHal::focusDistances);
-    p.set(CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY, 100);
+
+    p.set(CameraParameters::KEY_JPEG_THUMBNAIL_QUALITY, mCameraIndex ? STRINGIZE(FRONT_CAMERA_THUMB_QUALITY) : STRINGIZE(BACK_CAMERA_THUMB_QUALITY));
 
     if (setParameters(p) != NO_ERROR) {
         LOGE("Failed to set default parameters?!");
@@ -789,6 +811,7 @@ void CameraHal::previewThread()
 
                     if ( !mCameraIndex && CorrectPreview() < 0 )
                         LOGE("Error during CorrectPreview()");
+  
 
                     if ( CameraStart() < 0 ) {
                         LOGE("ERROR CameraStart()");
@@ -1330,7 +1353,7 @@ int CameraHal::CameraConfigure()
     parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     err = ioctl(camera_device, VIDIOC_G_PARM, &parm);
     if(err != 0) {
-        LOGD("VIDIOC_G_PARM ");
+        LOGD("VIDIOC_G_PARM Failed!!!!!");
         return -1;
     }
 
@@ -1354,7 +1377,7 @@ int CameraHal::CameraConfigure()
 
     err = ioctl(camera_device, VIDIOC_S_PARM, &parm);
     if(err != 0) {
-        LOGE("VIDIOC_S_PARM ");
+        LOGE("VIDIOC_S_PARM Failed!!!!!");
         return -1;
     }
 
@@ -1465,7 +1488,7 @@ int CameraHal::CameraStart()
     type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     err = ioctl(camera_device, VIDIOC_STREAMON, &type);
     if ( err < 0) {
-        LOGE("VIDIOC_STREAMON Failed");
+        LOGE("VIDIOC_STREAMON Failed!!!!!");
         goto fail_loop;
     }
 
@@ -1489,7 +1512,7 @@ int CameraHal::CameraStop()
     struct v4l2_requestbuffers creqbuf;
     creqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(camera_device, VIDIOC_STREAMOFF, &creqbuf.type) == -1) {
-        LOGE("VIDIOC_STREAMOFF Failed");
+        LOGE("VIDIOC_STREAMOFF Failed!!!!!");
         return -1;
     }
 
@@ -2203,7 +2226,7 @@ int CameraHal::ICapturePerform(){
         parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         err = ioctl(camera_device, VIDIOC_G_PARM, &parm);
         if(err != 0) {
-            LOGD("VIDIOC_G_PARM ");
+            LOGD("VIDIOC_G_PARM Failed!!!!!");
             return -1;
         }
 
@@ -2211,7 +2234,7 @@ int CameraHal::ICapturePerform(){
         parm.parm.capture.timeperframe.denominator = 10;
         err = ioctl(camera_device, VIDIOC_S_PARM, &parm);
         if(err != 0) {
-            LOGE("VIDIOC_S_PARM ");
+            LOGE("VIDIOC_S_PARM Failed!!!!!");
             return -1;
         }
     }
@@ -2301,7 +2324,7 @@ int CameraHal::ICapturePerform(){
     /* turn off streaming */
     creqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (ioctl(camera_device, VIDIOC_STREAMOFF, &creqbuf.type) < 0) {
-        LOGE("VIDIOC_STREAMON Failed");
+        LOGE("VIDIOC_STREAMON Failed!!!!!");
         return -1;
     }
 
@@ -2479,9 +2502,19 @@ int CameraHal::ICapturePerform(){
                 "image_width = %d, image_height = %d,  quality = %d, mippMode = %d",
                 (unsigned int)outBuffer , jpegSize, (unsigned int)yuv_buffer, yuv_len,
                 image_width, image_height, quality, mippMode);
-        jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
-                image_width, image_height, quality, exif_buf, jpegFormat, DEFAULT_THUMB_WIDTH, DEFAULT_THUMB_HEIGHT, image_width, image_height,
+
+        if ( mCameraIndex == 0 ) {
+                jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
+                image_width, image_height, quality, exif_buf, jpegFormat, BACK_CAMERA_DEFAULT_THUMB_WIDTH, BACK_CAMERA_DEFAULT_THUMB_HEIGHT, image_width, image_height,
                 image_rotation, image_zoom, 0, 0, image_width, image_height);
+        }
+        else
+        {
+                jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
+                image_width, image_height, quality, exif_buf, jpegFormat, FRONT_CAMERA_DEFAULT_THUMB_WIDTH, FRONT_CAMERA_DEFAULT_THUMB_HEIGHT, image_width, image_height,
+                image_rotation, image_zoom, 0, 0, image_width, image_height);
+        }
+
         PPM("AFTER JPEG Encode Image");
 
         mJPEGPictureMemBase = new MemoryBase(mJPEGPictureHeap, 128, jpegEncoder->jpegSize);
@@ -2870,7 +2903,17 @@ void CameraHal::procThread()
     FD_ZERO(&descriptorSet);
     FD_SET(procPipe[0], &descriptorSet);
 
-    mJPEGLength  = MAX_THUMB_WIDTH*MAX_THUMB_HEIGHT + PICTURE_WIDTH*PICTURE_HEIGHT + ((2*PAGE) - 1);
+    if ( mCameraIndex == 0 )
+    {
+        LOGD("BACK CAMERA JPEG LENGTH");
+        mJPEGLength  = BACK_CAMERA_MAX_THUMB_WIDTH * BACK_CAMERA_MAX_THUMB_HEIGHT + BACK_CAMERA_PICTURE_WIDTH * BACK_CAMERA_PICTURE_HEIGHT + ((2*PAGE) - 1);
+    }
+    else
+    {
+        LOGD("FRONT CAMERA JPEG LENGTH");
+        mJPEGLength  = FRONT_CAMERA_MAX_THUMB_WIDTH * FRONT_CAMERA_MAX_THUMB_HEIGHT + FRONT_CAMERA_PICTURE_WIDTH * FRONT_CAMERA_PICTURE_HEIGHT + ((2*PAGE) - 1);
+    }
+
     mJPEGLength &= ~((2*PAGE) - 1);
     mJPEGLength  += 2*PAGE;
     JPEGPictureHeap = new MemoryHeapBase(mJPEGLength);
@@ -3676,9 +3719,19 @@ status_t CameraHal::setParameters(const CameraParameters &params)
     //for correct parameters.
     params.getPreviewFpsRange(&framerate_min, &framerate_max);
 
-    if ( validateRange(framerate_min, framerate_max, supportedFpsRanges) == false ) {
-        LOGE("Range Not Supported");
-        return -EINVAL;
+    if ( mCameraIndex == 0 )
+    {
+        if ( validateRange(framerate_min, framerate_max, supportedFpsRanges) == false ) {
+            LOGE("Range Not Supported");
+            return -EINVAL;
+        }
+    }
+    else
+    {
+        if ( validateRange(framerate_min, framerate_max, supportedFpsRangesSecondary) == false ) {
+            LOGE("Range Not Supported");
+            return -EINVAL;
+        }
     }
 
     if (useFramerateRange){
