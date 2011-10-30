@@ -809,7 +809,7 @@ void CameraHal::previewThread()
 
 #endif
 
-                    if ( !mCameraIndex && CorrectPreview() < 0 )
+                    if ( mCameraIndex == 1 && CorrectPreview() < 0 )
                         LOGE("Error during CorrectPreview()");
   
 
@@ -1190,7 +1190,7 @@ void CameraHal::previewThread()
 
 #endif
 
-               if ( !mCameraIndex && CorrectPreview() < 0 )
+               if ( mCameraIndex == 1 && CorrectPreview() < 0 )
                    LOGE("Error during CorrectPreview()");
 
                if (CameraStart() < 0)
@@ -1469,7 +1469,7 @@ int CameraHal::CameraStart()
         mPreviewBuffers[i] = new MemoryBase(mPreviewHeaps[i], 0, mPreviewFrameSize);
     }
 
-    if( !mCameraIndex && ioctl(camera_device, VIDIOC_G_CROP, &mInitialCrop) < 0 ){
+    if( mCameraIndex == 1 && ioctl(camera_device, VIDIOC_G_CROP, &mInitialCrop) < 0 ){
         LOGE("[%s]: ERROR VIDIOC_G_CROP failed", strerror(errno));
         return -1;
     }
