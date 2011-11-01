@@ -1593,7 +1593,6 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
     }
 #endif
 
-#ifdef TARGET_OMAP4
     //Currently not supported with V4L2_S3D driver
     if (!overlayobj->mData.s3d_active) {
         //Set up the z-order for the overlay:
@@ -1605,7 +1604,6 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
 
         }
     }
-#endif
 
     if (overlayobj->getctrl_linkvideofd() > 0) {
         CommitLinkDevice(dev, overlayobj);
