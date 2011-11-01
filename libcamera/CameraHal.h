@@ -37,7 +37,7 @@
 #include <sys/stat.h>
 #include <utils/Log.h>
 #include <utils/threads.h>
-#include <linux/videodev2.h>
+#include "../include/videodev2.h"
 #include "binder/MemoryBase.h"
 #include "binder/MemoryHeapBase.h"
 #include <utils/threads.h>
@@ -166,11 +166,6 @@ extern "C" {
 #define FRONT_CAMERA_FOCUS_DISTANCE_NEAR     0.200000
 #define FRONT_CAMERA_FOCUS_DISTANCE_OPTIMAL  0.250000
 #define FRONT_CAMERA_ROTATION                0
-
-// extended control id for V4L2
-//#define V4L2_CID_PRIVATE_BASE		0x08000000
-#define V4L2_CID_SELECT_MODE        (V4L2_CID_PRIVATE_BASE + 45)
-#define V4L2_CID_SELECT_STATE       (V4L2_CID_PRIVATE_BASE + 46)
 
 // MISC
 #define ZOOM_SCALE (1<<16)

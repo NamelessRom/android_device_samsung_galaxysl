@@ -31,7 +31,6 @@
 #include <poll.h>
 #include "zoom_step.inc"
 
-
 #include <math.h>
 
 #include <cutils/properties.h>

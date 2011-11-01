@@ -21,7 +21,7 @@
 #ifndef ANDROID_ZOOM_REPO_HARDWARE_TI_OMAP3_LIBOVERLAY_V4L2_UTILS_H_
 #define ANDROID_ZOOM_REPO_HARDWARE_TI_OMAP3_LIBOVERLAY_V4L2_UTILS_H_
 
-#include <linux/videodev.h>
+#include "../include/videodev2.h"
 
 #define OVERLAY_DEVICE "/dev/video1"
 

@@ -24,6 +24,7 @@
 #include <hardware/overlay.h>
 #include "overlay_common.h"
 #include "v4l2_utils.h"
+#include "../include/videodev2.h"
 
 #define OVERLAY_DATA_MARKER  (0x68759746) // OVRLYSHM on phone keypad
 
@@ -238,6 +239,9 @@ public:
      * with the assumption that only one of this class is created.
      */
     overlay_object* mOmapOverlays[MAX_NUM_OVERLAYS];
+
+    /* record zorder of each overlay */
+    int mZorderUsage[MAX_NUM_OVERLAYS];
 
 };
 

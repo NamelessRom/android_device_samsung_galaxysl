@@ -26,7 +26,7 @@
 #include <errno.h>
 #include <cutils/log.h>
 #include <hardware/overlay.h>
-#include <linux/videodev.h>
+#include "../include/videodev2.h"
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <stdlib.h>
@@ -131,6 +131,7 @@ void dump_window(struct v4l2_window *win)
     LOGI("window t: %d ", win->w.top);
     LOGI("window w: %d ", win->w.width);
     LOGI("window h: %d\n", win->w.height);
+    LOGI("window zorder: %d\n", win->zorder);
 }
 void v4l2_overlay_dump_state(int fd)
 {

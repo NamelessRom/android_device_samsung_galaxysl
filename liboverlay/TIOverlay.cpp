@@ -34,13 +34,14 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <linux/videodev.h>
+#include "../include/videodev2.h"
 
 #include <cutils/log.h>
 #include <cutils/ashmem.h>
 #include <cutils/atomic.h>
 #include "overlay_common.h"
 #include "TIOverlay.h"
+
 
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
@@ -932,17 +933,41 @@ overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_contr
         goto error1;
     }
 #endif
-#ifdef TARGET_OMAP4
+
     /* Enable the video zorder and video transparency
-    * for the controls to be visible on top of video, give the graphics highest zOrder
-    **/
-    if (!isS3D) {
-        if ((ret = v4l2_overlay_set_zorder(fd, 1))) {
-            LOGE("Failed setting zorder\n");
-            goto error1;
-        }
-    }
-#endif
+     * for the controls to be visible on top of video, give the graphics highest zOrder
+     **/
+     if (!isS3D) {
+         /* Omap has 3 video pipelines whose zOrders are 0,1,and 2.
+          * The graphics overlay is special with reserved zOrder of 3.
+          * Graphics calls are not coming to this module.
+          * Overlay with higher zOrder is displayed on top of the one
+          * with lower zOrder. Two overlays assigned to the same
+          * zOrder will result in distortions on the video output.
+          * An available zOrder is assigned to this overlay.
+          **/
+         int maxZorder = -1;
+         for (int i=0; i < MAX_NUM_OVERLAYS; i++) {
+             if (self->mOmapOverlays[i] != NULL) {
+                 LOGD("mZorderUsage[%d] = %d is occupied", i, self->mZorderUsage[i]);
+                 if (self->mZorderUsage[i] > maxZorder) {
+                     maxZorder = self->mZorderUsage[i];
+                 }
+             }
+         }
+ 
+         if (maxZorder == MAX_NUM_OVERLAYS -1) {
+             LOGD("No zOrder is available\n");
+             goto error1;
+         }
+ 
+         self->mZorderUsage[overlayid] = maxZorder+1;
+         if (v4l2_overlay_set_zorder(fd, maxZorder+1)) {
+             LOGE("Failed setting zorder\n");
+             goto error1;
+         }
+         LOGD("mZorderUsage[%d] is assigned to %d", overlayid, self->mZorderUsage[overlayid]);
+     }
 
     if (v4l2_overlay_req_buf(fd, &num, 0, 0, EMEMORY_MMAP)) {
         LOGE("Failed requesting buffers\n");
@@ -1097,6 +1122,32 @@ void overlay_control_context_t::overlay_destroyOverlay(struct overlay_control_de
 
     //NOTE : needs no protection, as the calls are already serialized at Surfaceflinger level
     self->mOmapOverlays[index] = NULL;
+
+    /* When this overlay is destructed, its zOrder should be
+     * freed and all other overlays whose zOrder is higher
+     * than this overlay's zOrder should be lowered by 1 in order
+     * to make zOrder consectively occupied.
+     **/
+ 
+    int targetedZorder = self->mZorderUsage[index];
+    LOGD("mZorderUsage[%d] = %d should be removed", index, targetedZorder);
+ 
+    self->mZorderUsage[index] = -1;
+    for (int i=0; i < MAX_NUM_OVERLAYS; i++) {
+        if (self->mOmapOverlays[i] != NULL) {
+            if (self->mZorderUsage[i] > targetedZorder) {
+                LOGD("mZorderUsage[%d]=%d should be lowered by 1",i, self->mZorderUsage[i]);
+                self->mZorderUsage[i] -= 1;
+                overlay_object *overlayobj = static_cast<overlay_object *>(self->mOmapOverlays[i]);
+                int fd = overlayobj->getctrl_videofd();
+ 
+                if (v4l2_overlay_set_zorder(fd, self->mZorderUsage[i])) {
+                    LOGE("Failed setting zorder\n");
+                    //There is nothing to do if failed
+                }
+            }
+        }
+    }
 
 /* LGE_CHANGE_S, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
 #ifdef OVERLAY_COMPETE_WORKAROUND
