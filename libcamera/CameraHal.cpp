@@ -701,8 +701,21 @@ void CameraHal::previewThread()
             pfd[1].fd = camera_device;
             pfd[1].events = POLLIN;
 
-            if (poll(pfd, 2, 1000) == 0) {
-                continue;
+            // codeworkx: ce147 sensor is damn slow, highered polling timeout
+            if ( mCameraIndex == 0 ) {
+
+                if (poll(pfd, 2, 10000) == 0) {
+                    LOGD("previewThread(): failed at polling (ce147)");
+                    continue;
+                }
+
+            } else {
+
+                if (poll(pfd, 2, 1000) == 0) {
+                    LOGD("previewThread(): failed at polling (s5ka3dfx)");
+                    continue;
+                }
+
             }
 
             if (pfd[0].revents & POLLIN) {
