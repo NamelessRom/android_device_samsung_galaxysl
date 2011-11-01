@@ -19,6 +19,12 @@ fi
 
 busybox gunzip -c ${RAMDISK} | busybox cpio -i
 
+if busybox grep -q bootmode=5 /proc/cmdline || busybox grep -q androidboot.mode=usb_charger /proc/cmdline ; then
+    # charging mode
+    busybox cp lpm.rc init.rc
+	busybox rm init.latona.rc
+fi
+
 busybox umount /sys
 busybox umount /proc
 busybox date >>boot.txt
