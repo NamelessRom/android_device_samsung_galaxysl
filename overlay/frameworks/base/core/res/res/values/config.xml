@@ -27,12 +27,6 @@
     <!-- There is no charging LED. -->
     <bool name="config_unplugTurnsOnScreen">true</bool>
 
-    <!-- Our amoled doesn't animate well. -->
-    <bool name="config_animateScreenLights">false</bool>
-
-    <!-- disable menu hard key on Crespo in non-pattern lockscreen -->
-    <bool name="config_disableMenuKeyInLockScreen">true</bool>
-
     <!-- Array of light sensor LUX values to define our levels for auto backlight brightness support.
          The N entries of this array define N + 1 zones as follows:
 
@@ -55,11 +49,11 @@
          than the size of the config_autoBrightnessLevels array.
     -->
     <integer-array name="config_autoBrightnessLcdBacklightValues">
-        <item>25</item>
-        <item>40</item>
+        <item>35</item>
         <item>55</item>
         <item>70</item>
-        <item>255</item>
+        <item>70</item>
+        <item>250</item>
     </integer-array>
 
     <!-- Array of output values for button backlight corresponding to the LUX values
@@ -85,7 +79,8 @@
         <item>0</item>
         <item>0</item>
         <item>0</item>
-    </integer-array>    
+    </integer-array>
+    
     <!-- Component name of the default wallpaper. This will be ImageWallpaper if not 
          specified -->
     <string name="default_wallpaper_component">com.android.wallpaper/.nexus.NexusWallpaper</string>
@@ -133,8 +128,8 @@
     <!-- Regex array of allowable upstream ifaces for tethering - for example if you want
          tethering on a new interface called "foo2" add <item>"foo\\d"</item> to the array -->
     <string-array translatable="false" name="config_tether_upstream_regexs">
-        <item>"pdp\\d"</item>
-        <item>"eth\\d"</item>
+        <item>"rmnet\\d"</item>
+        <item>"tiwlan\\d"</item>
     </string-array>
 
     <!-- List of regexpressions describing the interface (if any) that represent tetherable
@@ -165,4 +160,11 @@
     <!-- Boolean indicating if restoring network selection should be skipped -->
     <!-- The restoring is handled by modem if it is true -->
     <bool translatable="false" name="skip_restoring_network_selection">true</bool>
+
+    <!-- Specifies the amount of time to disable virtual keys after the screen is touched
+         in order to filter out accidental virtual key presses due to swiping gestures
+         or taps near the edge of the display.  May be 0 to disable the feature.
+         It is recommended that this value be no more than 250 ms.
+         This feature should be disabled for most devices. -->
+    <integer name="config_virtualKeyQuietTimeMillis">250</integer>
 </resources>
