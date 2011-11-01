@@ -700,21 +700,9 @@ void CameraHal::previewThread()
             pfd[1].fd = camera_device;
             pfd[1].events = POLLIN;
 
-            // codeworkx: ce147 sensor is damn slow, highered polling timeout
-            if ( mCameraIndex == 0 ) {
-
-                if (poll(pfd, 2, 10000) == 0) {
-                    LOGD("previewThread(): failed at polling");
-                    continue;
-                }
-
-            } else {
-
-                if (poll(pfd, 2, 1000) == 0) {
-                    LOGD("previewThread(): failed at polling");
-                    continue;
-                }
-
+            if (poll(pfd, 2, 10000) == 0) {
+                LOGD("previewThread(): failed at polling");
+                continue;
             }
 
             if (pfd[0].revents & POLLIN) {
@@ -822,9 +810,10 @@ void CameraHal::previewThread()
 
 #endif
 
-                    if ( mCameraIndex == 1 && CorrectPreview() < 0 )
+/*
+                    if ( CorrectPreview() < 0 )
                         LOGE("Error during CorrectPreview()");
-  
+*/  
 
                     if ( CameraStart() < 0 ) {
                         LOGE("ERROR CameraStart()");
@@ -1203,8 +1192,10 @@ void CameraHal::previewThread()
 
 #endif
 
-               if ( mCameraIndex == 1 && CorrectPreview() < 0 )
+/*
+               if ( CorrectPreview() < 0 )
                    LOGE("Error during CorrectPreview()");
+*/
 
                if (CameraStart() < 0)
                    LOGE("ERROR CameraStart()");
@@ -1344,15 +1335,15 @@ int CameraHal::CameraConfigure()
     LOGD("CameraConfigure(): setting preview state.\n");
     vc.id = V4L2_CID_SELECT_STATE;
 
-    if ( mCameraIndex == 0)
+    if ( mCameraIndex == 0 )
     {
         vc.value = BACK_CAMERA_STATE_PREVIEW;
-    }
-    else
+    } 
+    else if ( mCameraIndex == 1 )
     {
         vc.value = FRONT_CAMERA_STATE_PREVIEW;
     }
-
+    
     err = ioctl(camera_device, VIDIOC_S_CTRL, &vc);
     if ( err < 0 ){
         LOGE ("Failed to set VIDIOC_S_CTRL.");
@@ -1499,13 +1490,14 @@ int CameraHal::CameraStart()
         mPreviewHeaps[i] = new MemoryHeapBase(data->fd,mPreviewFrameSize, 0, data->offset);
         mPreviewBuffers[i] = new MemoryBase(mPreviewHeaps[i], 0, mPreviewFrameSize);
     }
-
-    if( mCameraIndex == 1 && ioctl(camera_device, VIDIOC_G_CROP, &mInitialCrop) < 0 ){
+/*
+    if( ioctl(camera_device, VIDIOC_G_CROP, &mInitialCrop) < 0 ){
         LOGE("[%s]: ERROR VIDIOC_G_CROP failed", strerror(errno));
         return -1;
     }
 
     LOGE("Initial Crop: crop_top = %d, crop_left = %d, crop_width = %d, crop_height = %d", mInitialCrop.c.top, mInitialCrop.c.left, mInitialCrop.c.width, mInitialCrop.c.height);
+*/
 
     if ( mZoomTargetIdx != mZoomCurrentIdx ) {
 
@@ -2232,11 +2224,11 @@ int CameraHal::ICapturePerform(){
     LOGD("ICapturePerform(): setting capture state.\n");
     vc.id = V4L2_CID_SELECT_STATE;
 
-    if ( mCameraIndex == 0)
+    if ( mCameraIndex == 0 )
     {
         vc.value = BACK_CAMERA_STATE_CAPTURE;
     }
-    else
+    else if ( mCameraIndex == 1 )
     {
         vc.value = FRONT_CAMERA_STATE_CAPTURE;
     }
