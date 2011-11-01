@@ -705,14 +705,14 @@ void CameraHal::previewThread()
             if ( mCameraIndex == 0 ) {
 
                 if (poll(pfd, 2, 10000) == 0) {
-                    LOGD("previewThread(): failed at polling (ce147)");
+                    LOGD("previewThread(): failed at polling");
                     continue;
                 }
 
             } else {
 
                 if (poll(pfd, 2, 1000) == 0) {
-                    LOGD("previewThread(): failed at polling (s5ka3dfx)");
+                    LOGD("previewThread(): failed at polling");
                     continue;
                 }
 
@@ -1342,6 +1342,7 @@ int CameraHal::CameraConfigure()
     mParameters.getPreviewSize(&w, &h);
 
     /* Set preview state */
+    LOGD("CameraConfigure(): setting preview state.\n");
     vc.id = V4L2_CID_SELECT_STATE;
 
     if ( mCameraIndex == 0)
@@ -2224,8 +2225,27 @@ int CameraHal::ICapturePerform(){
     int ippTempConfigMode;
     int jpegFormat = PIX_YUV422I;
     v4l2_streamparm parm;
+    struct v4l2_control vc;
 
     LOG_FUNCTION_NAME
+
+    /* Set capture state */
+    LOGD("ICapturePerform(): setting capture state.\n");
+    vc.id = V4L2_CID_SELECT_STATE;
+
+    if ( mCameraIndex == 0)
+    {
+        vc.value = BACK_CAMERA_STATE_CAPTURE;
+    }
+    else
+    {
+        vc.value = FRONT_CAMERA_STATE_CAPTURE;
+    }
+
+    err = ioctl(camera_device, VIDIOC_S_CTRL, &vc);
+    if ( err < 0 ){
+        LOGE ("Failed to set VIDIOC_S_CTRL.");
+    }
 
     LOGD("\n\n\n PICTURE NUMBER =%d\n\n\n",++pictureNumber);
 
