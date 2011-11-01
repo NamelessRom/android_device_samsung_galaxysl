@@ -31,6 +31,7 @@
 #include <poll.h>
 #include "zoom_step.inc"
 
+
 #include <math.h>
 
 #include <cutils/properties.h>
@@ -1326,6 +1327,23 @@ int CameraHal::CameraConfigure()
     LOG_FUNCTION_NAME
 
     mParameters.getPreviewSize(&w, &h);
+
+    /* Set preview state */
+    vc.id = V4L2_CID_SELECT_STATE;
+
+    if ( mCameraIndex == 0)
+    {
+        vc.value = BACK_CAMERA_STATE_PREVIEW;
+    }
+    else
+    {
+        vc.value = FRONT_CAMERA_STATE_PREVIEW;
+    }
+
+    err = ioctl(camera_device, VIDIOC_S_CTRL, &vc);
+    if ( err < 0 ){
+        LOGE ("Failed to set VIDIOC_S_CTRL.");
+    }
 
     /* Set preview format */
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;

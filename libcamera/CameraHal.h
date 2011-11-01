@@ -115,6 +115,12 @@ extern "C" {
 
 // CE147 - BACK CAMERA
 #define BACK_CAMERA_DEVICE                  "/dev/video0"
+#define BACK_CAMERA_STATE_PREVIEW	        0x0000	/*  preview state */
+#define BACK_CAMERA_STATE_CAPTURE	        0x0001	/*  capture state */
+#define BACK_CAMERA_STATE_INVALID	        0x0002	/*  invalid state */
+#define BACK_CAMERA_MODE_CAMERA             1
+#define BACK_CAMERA_MODE_CAMCORDER          2
+#define BACK_CAMERA_MODE_VT                 3
 #define BACK_CAMERA_MAX_THUMB_WIDTH         160
 #define BACK_CAMERA_MAX_THUMB_HEIGHT        120
 #define BACK_CAMERA_DEFAULT_THUMB_WIDTH     160
@@ -136,6 +142,12 @@ extern "C" {
 
 // S5KA3DFX - FRONT CAMERA
 #define FRONT_CAMERA_DEVICE                  "/dev/video5"
+#define FRONT_CAMERA_STATE_PREVIEW	         0x0000	/*  preview state */
+#define FRONT_CAMERA_STATE_CAPTURE	         0x0001	/*  capture state */
+#define FRONT_CAMERA_STATE_INVALID           0x0002	/*  invalid state */
+#define FRONT_CAMERA_MODE_CAMERA             1
+#define FRONT_CAMERA_MODE_CAMCORDER          2
+#define FRONT_CAMERA_MODE_VT                 3
 #define FRONT_CAMERA_MAX_THUMB_WIDTH         160
 #define FRONT_CAMERA_MAX_THUMB_HEIGHT        120
 #define FRONT_CAMERA_DEFAULT_THUMB_WIDTH     160
@@ -154,6 +166,11 @@ extern "C" {
 #define FRONT_CAMERA_FOCUS_DISTANCE_NEAR     0.200000
 #define FRONT_CAMERA_FOCUS_DISTANCE_OPTIMAL  0.250000
 #define FRONT_CAMERA_ROTATION                0
+
+// extended control id for V4L2
+//#define V4L2_CID_PRIVATE_BASE		0x08000000
+#define V4L2_CID_SELECT_MODE        (V4L2_CID_PRIVATE_BASE + 45)
+#define V4L2_CID_SELECT_STATE       (V4L2_CID_PRIVATE_BASE + 46)
 
 // MISC
 #define ZOOM_SCALE (1<<16)
