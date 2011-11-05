@@ -96,6 +96,7 @@ extern "C" {
 #define MAX_CAMERA_BUFFERS       NUM_OVERLAY_BUFFERS_REQUESTED
 #define STRINGIZE_(x)            #x
 #define STRINGIZE(x)             STRINGIZE_(x)
+#define CLEAR(x)                 memset (&(x), 0, sizeof (x))
 
 // COMMON
 #define PREVIEW_WIDTH                 640
@@ -112,8 +113,11 @@ extern "C" {
 #define MAX_FPS                       30
 #define FOCUS_DISTANCE_BUFFER_SIZE    30
 #define MANUAL_FOCUS_DEFAULT_POSITION 50
+#define MAX_ZOOM_STEPS                23
+#define MAX_ZOOM                      30
 
 // CE147 - BACK CAMERA
+#define BACK_CAMERA                         0
 #define BACK_CAMERA_DEVICE                  "/dev/video0"
 #define BACK_CAMERA_STATE_PREVIEW	        0x0000	/*  preview state */
 #define BACK_CAMERA_STATE_CAPTURE	        0x0001	/*  capture state */
@@ -141,6 +145,7 @@ extern "C" {
 #define BACK_CAMERA_ROTATION                0
 
 // S5KA3DFX - FRONT CAMERA
+#define FRONT_CAMERA                         1
 #define FRONT_CAMERA_DEVICE                  "/dev/video5"
 #define FRONT_CAMERA_STATE_PREVIEW	         0x0000	/*  preview state */
 #define FRONT_CAMERA_STATE_CAPTURE	         0x0001	/*  capture state */
@@ -536,6 +541,12 @@ public:
     void PPM(const char *);
     void PPM(const char *, struct timeval*, ...);
     status_t convertGPSCoord(double coord, int *deg, int *min, int *sec);
+
+//  SAMSUNG START
+    int mPreviousZoom;
+    status_t setZoom(int zoom);
+//  SAMSUNG END
+
 
 #ifdef IMAGE_PROCESSING_PIPELINE
 

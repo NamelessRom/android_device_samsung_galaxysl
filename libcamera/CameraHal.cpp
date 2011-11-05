@@ -346,6 +346,7 @@ void CameraHal::initDefaultParameters()
     CameraParameters p;
     char tmpBuffer[PARAM_BUFFER], zoomStageBuffer[PARAM_BUFFER];
     unsigned int zoomStage;
+    mPreviousZoom = 1;
 
     LOG_FUNCTION_NAME
 
@@ -354,7 +355,7 @@ void CameraHal::initDefaultParameters()
     //If application does not decide, framerate will be used in CameraHAL
     char fpsRange[32];
 
-    if ( mCameraIndex == 0) 
+    if ( mCameraIndex == BACK_CAMERA) 
     {
         p.setPreviewSize(BACK_CAMERA_MIN_PREVIEW_WIDTH, BACK_CAMERA_MIN_PREVIEW_HEIGHT);
         sprintf(fpsRange, "%d,%d", 7000, 30000);
@@ -498,7 +499,7 @@ void CameraHal::initDefaultParameters()
     p.set(CameraParameters::KEY_VIDEO_FRAME_FORMAT, CameraParameters::PIXEL_FORMAT_YUV422I);
 
     //Set focus distances
-    if ( mCameraIndex == 0 )
+    if ( mCameraIndex == BACK_CAMERA )
     {
         sprintf(CameraHal::focusDistances, "%f,%f,%s", BACK_CAMERA_FOCUS_DISTANCE_NEAR, BACK_CAMERA_FOCUS_DISTANCE_OPTIMAL, CameraParameters::FOCUS_DISTANCE_INFINITY);
     }
@@ -1335,11 +1336,11 @@ int CameraHal::CameraConfigure()
     LOGD("CameraConfigure(): setting preview state.\n");
     vc.id = V4L2_CID_SELECT_STATE;
 
-    if ( mCameraIndex == 0 )
+    if ( mCameraIndex == BACK_CAMERA )
     {
         vc.value = BACK_CAMERA_STATE_PREVIEW;
     } 
-    else if ( mCameraIndex == 1 )
+    else if ( mCameraIndex == FRONT_CAMERA )
     {
         vc.value = FRONT_CAMERA_STATE_PREVIEW;
     }
@@ -1501,7 +1502,7 @@ int CameraHal::CameraStart()
 
     if ( mZoomTargetIdx != mZoomCurrentIdx ) {
 
-        if( ZoomPerform(zoom_step[mZoomTargetIdx]) < 0 )
+        if( setZoom(zoom_step[mZoomTargetIdx]) < 0 )
             LOGE("Error while applying zoom");
 
         mZoomCurrentIdx = mZoomTargetIdx;
@@ -1688,7 +1689,7 @@ void CameraHal::nextPreview()
             mZoomCurrentIdx = mZoomTargetIdx;
         }
 
-        ZoomPerform(zoom_step[mZoomCurrentIdx]);
+        setZoom(zoom_step[mZoomCurrentIdx]);
 
         // Update mParameters with current zoom position only if smooth zoom is used
         // Immediate zoom should not generate callbacks.
@@ -2224,11 +2225,11 @@ int CameraHal::ICapturePerform(){
     LOGD("ICapturePerform(): setting capture state.\n");
     vc.id = V4L2_CID_SELECT_STATE;
 
-    if ( mCameraIndex == 0 )
+    if ( mCameraIndex == BACK_CAMERA )
     {
         vc.value = BACK_CAMERA_STATE_CAPTURE;
     }
-    else if ( mCameraIndex == 1 )
+    else if ( mCameraIndex == FRONT_CAMERA )
     {
         vc.value = FRONT_CAMERA_STATE_CAPTURE;
     }
@@ -2545,7 +2546,7 @@ int CameraHal::ICapturePerform(){
                 (unsigned int)outBuffer , jpegSize, (unsigned int)yuv_buffer, yuv_len,
                 image_width, image_height, quality, mippMode);
 
-        if ( mCameraIndex == 0 ) {
+        if ( mCameraIndex == BACK_CAMERA ) {
                 jpegEncoder->encodeImage((uint8_t *)outBuffer , jpegSize, yuv_buffer, yuv_len,
                 image_width, image_height, quality, exif_buf, jpegFormat, BACK_CAMERA_DEFAULT_THUMB_WIDTH, BACK_CAMERA_DEFAULT_THUMB_HEIGHT, image_width, image_height,
                 image_rotation, image_zoom, 0, 0, image_width, image_height);
@@ -2945,7 +2946,7 @@ void CameraHal::procThread()
     FD_ZERO(&descriptorSet);
     FD_SET(procPipe[0], &descriptorSet);
 
-    if ( mCameraIndex == 0 )
+    if ( mCameraIndex == BACK_CAMERA )
     {
         LOGD("BACK CAMERA JPEG LENGTH");
         mJPEGLength  = BACK_CAMERA_MAX_THUMB_WIDTH * BACK_CAMERA_MAX_THUMB_HEIGHT + BACK_CAMERA_PICTURE_WIDTH * BACK_CAMERA_PICTURE_HEIGHT + ((2*PAGE) - 1);
@@ -3761,7 +3762,7 @@ status_t CameraHal::setParameters(const CameraParameters &params)
     //for correct parameters.
     params.getPreviewFpsRange(&framerate_min, &framerate_max);
 
-    if ( mCameraIndex == 0 )
+    if ( mCameraIndex == BACK_CAMERA )
     {
         if ( validateRange(framerate_min, framerate_max, supportedFpsRanges) == false ) {
             LOGE("Range Not Supported");
@@ -4764,6 +4765,46 @@ exit:
 
     return params;
 }
+
+
+// SAMSUNG START
+
+status_t CameraHal::setZoom(int zoom)
+{
+	if(camera_device && mCameraIndex == BACK_CAMERA)
+	{
+		if(zoom < 0 || zoom > MAX_ZOOM) {
+			if(zoom < 0) 
+				mParameters.set(mParameters.KEY_ZOOM, 0);
+			if(zoom > MAX_ZOOM) 
+				mParameters.set(mParameters.KEY_ZOOM, MAX_ZOOM);
+			return UNKNOWN_ERROR; 
+		}
+
+		struct v4l2_control vc;
+
+		if(zoom != mPreviousZoom)
+		{
+			LOGD("setZoom : mPreviousZoom =%d zoom=%d\n", mPreviousZoom,zoom);
+
+			CLEAR(vc);
+			vc.id = V4L2_CID_ZOOM;
+			vc.value = zoom;
+
+			if (ioctl (camera_device, VIDIOC_S_CTRL, &vc) < 0)
+			{
+				LOGE("setZoom fail\n");
+				return UNKNOWN_ERROR; 
+			}
+		}
+
+		mPreviousZoom = zoom;
+	}
+	return NO_ERROR;
+}
+
+// SAMSUNG END
+
 
 status_t  CameraHal::dump(int fd, const Vector<String16>& args) const
 {
