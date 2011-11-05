@@ -275,6 +275,14 @@ on boot
     chmod 0666 /sys/devices/platform/omapdss/display2/timings
     chmod 0666 /sys/devices/platform/omapdss/display3/timings
 
+    # enable alpha blending on overlay managers to make gui controls visible
+    chown system system /sys/devices/platform/omapdss/manager0/alpha_blending_enabled
+    chown system system /sys/devices/platform/omapdss/manager1/alpha_blending_enabled
+    chmod 0666 /sys/devices/platform/omapdss/manager0/alpha_blending_enabled
+    chmod 0666 /sys/devices/platform/omapdss/manager1/alpha_blending_enabled
+    write /sys/devices/platform/omapdss/manager0/alpha_blending_enabled 1
+    write /sys/devices/platform/omapdss/manager1/alpha_blending_enabled 1
+
     # change permissions for lcd_power
     chown radio system /sys/class/backlight/omap_bl/device/lcd_power
     
