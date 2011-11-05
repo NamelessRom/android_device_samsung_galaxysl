@@ -157,6 +157,9 @@ PRODUCT_PACKAGES += \
     libOMX.TI.WMA.decode.so \
     libOMX_Core.so \
 
+# device specific overlays
+DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
+
 # OpenMAX IL configuration
 TI_OMX_POLICY_MANAGER := hardware/ti/omx/system/src/openmax_il/omx_policy_manager
 PRODUCT_COPY_FILES += \
