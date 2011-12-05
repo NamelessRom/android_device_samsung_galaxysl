@@ -42,7 +42,6 @@
 #define KEY_BRIGHTNESS          "brightness"
 #define KEY_CAF                 "caf"
 #define KEY_IPP                 "ippMode"
-#define KEY_PREVIEW_FPS_RANGE   "preview-fps-range"
 
 #define EFFECT_COOL             "cool"
 #define EFFECT_EMBOSS           "emboss"
@@ -74,16 +73,17 @@
 #define EXPOSURE_VERYLONG       "very-long"
 #define WHITE_BALANCE_HORIZON   "horizon"
 #define WHITE_BALANCE_TUNGSTEN  "tungsten"
-#define FOCUS_MODE_MANUAL       "manual"
 
 #define ROTATION_PHYSICAL       0
 #define ROTATION_EXIF           1
+#define COMPENSATION_MIN        -20
+#define COMPENSATION_MAX        20
+#define COMPENSATION_STEP       "0.1"
 #define CONTRAST_OFFSET         100
 #define BRIGHTNESS_OFFSET       100
 #define SATURATION_OFFSET       100
 #define PARM_ZOOM_SCALE  100
 
-#define MAX_CAMERAS_SUPPORTED   2
 
 #endif
 

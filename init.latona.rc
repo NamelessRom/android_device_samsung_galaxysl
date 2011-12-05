@@ -382,6 +382,15 @@ on boot
     chown bluetooth bluetooth /sys/class/rfkill/rfkill0/type
     write sys/class/rfkill/rfkill0/state 0
 
+# enable touch boost
+    write /sys/touchscreen/touch_boost 1
+    
+# CM7 touchscreen fix (waleedq)
+ 	write /sys/touchscreen/set_touchscreen 7032
+ 	write /sys/touchscreen/set_noise 4027
+ 	write /sys/touchscreen/set_acquisition 4000
+ 	exec /system/bin/cat /sys/touchscreen/set_write
+ 	
 # permission for touchscreen
     chown system system /sys/touchscreen/bootcomplete
     chown system system /sys/touchscreen/set_qt_firm_update

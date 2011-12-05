@@ -16,8 +16,6 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
- * This file contains material that is available under the Apache License
  */
 
 
@@ -25,7 +23,6 @@
 #define ANDROID_HARDWARE_CAMERA_HARDWARE_H
 
 #include <stdio.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -37,756 +34,720 @@
 #include <sys/stat.h>
 #include <utils/Log.h>
 #include <utils/threads.h>
-#include "../include/videodev2.h"
 #include "binder/MemoryBase.h"
 #include "binder/MemoryHeapBase.h"
 #include <utils/threads.h>
 #include <ui/Overlay.h>
 #include <camera/CameraHardwareInterface.h>
 #include "MessageQueue.h"
-#include "overlay_common.h"
-#include "CameraHalParams.h"
 
-#ifdef HARDWARE_OMX
-#include <JpegEncoderEXIF.h>
-#endif
+//[for EXIF
+#include <cutils/tztime.h>
+#include <math.h>
 
-#define RESIZER 1
-#define JPEG 1
-#define VPP 1
+#include "Exif.h"
+#include "ExifCreator.h"
 
-#define PPM_INSTRUMENTATION 1
-
-#define DEBUG_LOG 1
-
-//#undef FW3A
-//#undef ICAP
-//#undef IMAGE_PROCESSING_PIPELINE
-
-#ifdef FW3A
 extern "C" {
-#include "icam_icap/icamera.h"
-#include "icam_icap/icapture_v2.h"
+	#include <stdio.h>
+	#include <sys/types.h>
 }
+//]
+
+#include "videodev2.h"
+#include "RotationInterface.h"
+#include "overlay_common.h"
+
+//[Debugging Options
+#define HAL_DEBUGGING		1
+#define TIMECHECK			0
+#define CHECK_FRAMERATE		0
+
+#if HAL_DEBUGGING
+#define HAL_PRINT(arg1,arg2...) LOGD(arg1,## arg2)
+#else
+#define HAL_PRINT(arg1,arg2...)
 #endif
+
+#define LOG_FUNCTION_NAME      		LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
+#define LOG_FUNCTION_NAME_EXIT 		LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
+//]
+
+#define CAMERA_MSG_ASD      0x204
+#define EVE_CAM //NCB-TI
+#define VT_BACKGROUND_SOLUTION	// Latona TD/Heron : It's for VT of CMCC projects
+#define CAMERA_MODE_JPEG    1
+#define CAMERA_MODE_YUV     2
+#define MAIN_CAMERA         0
+#define VGA_CAMERA          1
+#define RESIZER             1
+#define JPEG                1
+
+#define OMAP_SCALE			1	// RealCAM Preview & Capture landscpae view option for GB
+
+#define CLEAR(x) memset (&(x), 0, sizeof (x))
+
+#ifdef CAMERA_ALGO
+#include "CameraAlgo.h"
+#include "arc_facetracking/include/arcsoft_face_tracking.h"
+#include "include/amcomdef.h"
+
+#define FACE_COUNT  10
+#define FRAME_SKIP  0
+#define STABILITY   0
+#define RATIO       10
+#endif
+
+#ifdef OMAP_ENHANCEMENT
 
 #ifdef HARDWARE_OMX
 #include "JpegEncoder.h"
+#include "JpegDecoder.h"
 #endif
 
-#ifdef IMAGE_PROCESSING_PIPELINE
-#include "imageprocessingpipeline.h"
-#include "ipp_algotypes.h"
-#include "capdefs.h"
-
-#define MAXIPPDynamicParams 10
-
 #endif
-#define MAX_BURST 15
-#define DSP_CACHE_ALIGNMENT 128
-#define BUFF_MAP_PADDING_TEST 256
-#define DSP_CACHE_ALIGN_MEM_ALLOC(__size__) \
-    memalign(DSP_CACHE_ALIGNMENT, __size__ + BUFF_MAP_PADDING_TEST)
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#define FOCUS_RECT          		0
+/* colours in focus rectangle */
+#define FOCUS_RECT_RED      		0x10
+#define FOCUS_RECT_GREEN    		0x1F
+#define FOCUS_RECT_WHITE    		0xFF
 
-#define LOG_FUNCTION_NAME        LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
-#define LOG_FUNCTION_NAME_EXIT   LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
-#define VIDEO_FRAME_COUNT_MAX    NUM_OVERLAY_BUFFERS_REQUESTED
-#define MAX_CAMERA_BUFFERS       NUM_OVERLAY_BUFFERS_REQUESTED
-#define STRINGIZE_(x)            #x
-#define STRINGIZE(x)             STRINGIZE_(x)
-#define CLEAR(x)                 memset (&(x), 0, sizeof (x))
+#define VIDEO_DEVICE5       		"/dev/video5"
+#define VIDEO_DEVICE        		"/dev/video0"
 
-// COMMON
-#define PREVIEW_WIDTH                 640
-#define PREVIEW_HEIGHT                480
-#define CAPTURE_8MP_WIDTH             3280
-#define CAPTURE_8MP_HEIGHT            2464
-#define PIXEL_FORMAT                  V4L2_PIX_FMT_UYVY
-#define MIN_THUMB_WIDTH               160
-#define MIN_THUMB_HEIGHT              120
-#define COMPENSATION_OFFSET           20
-#define CONTRAST_OFFSET               100
-#define BRIGHTNESS_OFFSET             100
-#define MIN_FPS                       7
-#define MAX_FPS                       30
-#define FOCUS_DISTANCE_BUFFER_SIZE    30
-#define MANUAL_FOCUS_DEFAULT_POSITION 50
-#define MAX_ZOOM_STEPS                23
-#define MAX_ZOOM                      30
+#define MIN_WIDTH           		128
+#define MIN_HEIGHT          		96
+#define CIF_WIDTH           		352
+#define CIF_HEIGHT          		288
 
-// CE147 - BACK CAMERA
-#define BACK_CAMERA                         0
-#define BACK_CAMERA_DEVICE                  "/dev/video0"
-#define BACK_CAMERA_STATE_PREVIEW	        0x0000	/*  preview state */
-#define BACK_CAMERA_STATE_CAPTURE	        0x0001	/*  capture state */
-#define BACK_CAMERA_STATE_INVALID	        0x0002	/*  invalid state */
-#define BACK_CAMERA_MODE_CAMERA             1
-#define BACK_CAMERA_MODE_CAMCORDER          2
-#define BACK_CAMERA_MODE_VT                 3
-#define BACK_CAMERA_MAX_THUMB_WIDTH         160
-#define BACK_CAMERA_MAX_THUMB_HEIGHT        120
-#define BACK_CAMERA_DEFAULT_THUMB_WIDTH     160
-#define BACK_CAMERA_DEFAULT_THUMB_HEIGHT    120
-#define BACK_CAMERA_THUMB_QUALITY           100
-#define BACK_CAMERA_FOCALLENGTH             3.79
-#define BACK_CAMERA_HORZANGLE               51.2
-#define BACK_CAMERA_VERTANGLE               39.4
-#define BACK_CAMERA_COMPENSATION_MIN        -4
-#define BACK_CAMERA_COMPENSATION_MAX        4
-#define BACK_CAMERA_COMPENSATION_STEP       "0.5"
-#define BACK_CAMERA_PICTURE_WIDTH           2560 
-#define BACK_CAMERA_PICTURE_HEIGHT          1920
-#define BACK_CAMERA_MIN_PREVIEW_WIDTH       352
-#define BACK_CAMERA_MIN_PREVIEW_HEIGHT      288
-#define BACK_CAMERA_FOCUS_DISTANCE_NEAR     0.100000
-#define BACK_CAMERA_FOCUS_DISTANCE_OPTIMAL  1.200000
-#define BACK_CAMERA_ROTATION                0
+#define PICTURE_WIDTH       		2560 /* 5mp - 2560. 8mp - 3280 */ /* Make sure it is a multiple of 16. */
+#define PICTURE_HEIGHT      		1920 /* 5mp - 2048. 8mp - 2464 */ /* Make sure it is a multiple of 16. */
+#define PREVIEW_WIDTH       		640
+#define PREVIEW_HEIGHT      		480
+#define JPEG_THUMBNAIL_WIDTH		160
+#define JPEG_THUMBNAIL_HEIGHT		120
 
-// S5KA3DFX - FRONT CAMERA
-#define FRONT_CAMERA                         1
-#define FRONT_CAMERA_DEVICE                  "/dev/video5"
-#define FRONT_CAMERA_STATE_PREVIEW	         0x0000	/*  preview state */
-#define FRONT_CAMERA_STATE_CAPTURE	         0x0001	/*  capture state */
-#define FRONT_CAMERA_STATE_INVALID           0x0002	/*  invalid state */
-#define FRONT_CAMERA_MODE_CAMERA             1
-#define FRONT_CAMERA_MODE_CAMCORDER          2
-#define FRONT_CAMERA_MODE_VT                 3
-#define FRONT_CAMERA_MAX_THUMB_WIDTH         160
-#define FRONT_CAMERA_MAX_THUMB_HEIGHT        120
-#define FRONT_CAMERA_DEFAULT_THUMB_WIDTH     160
-#define FRONT_CAMERA_DEFAULT_THUMB_HEIGHT    120
-#define FRONT_CAMERA_THUMB_QUALITY           100
-#define FRONT_CAMERA_FOCALLENGTH             0.9 
-#define FRONT_CAMERA_HORZANGLE               51.2
-#define FRONT_CAMERA_VERTANGLE               39.4
-#define FRONT_CAMERA_COMPENSATION_MIN        -4
-#define FRONT_CAMERA_COMPENSATION_MAX        4
-#define FRONT_CAMERA_COMPENSATION_STEP       "0.5"
-#define FRONT_CAMERA_PICTURE_WIDTH           640
-#define FRONT_CAMERA_PICTURE_HEIGHT          480
-#define FRONT_CAMERA_MIN_PREVIEW_WIDTH       176
-#define FRONT_CAMERA_MIN_PREVIEW_HEIGHT      144
-#define FRONT_CAMERA_FOCUS_DISTANCE_NEAR     0.200000
-#define FRONT_CAMERA_FOCUS_DISTANCE_OPTIMAL  0.250000
-#define FRONT_CAMERA_ROTATION                0
+#define PIXEL_FORMAT           		V4L2_PIX_FMT_UYVY
+#define PIXEL_FORMAT_JPEG      		V4L2_PIX_FMT_JPEG
 
-// MISC
-#define ZOOM_SCALE (1<<16)
+#define VIDEO_FRAME_COUNT_MAX		NUM_OVERLAY_BUFFERS_REQUESTED
+#define MAX_CAMERA_BUFFERS    		NUM_OVERLAY_BUFFERS_REQUESTED
 
-#define PIX_YUV422I 0
-#define PIX_YUV420P 1
-#define KEY_ROTATION_TYPE       "rotation-type"
-#define ROTATION_PHYSICAL       0
-#define ROTATION_EXIF           1
+#define DEFAULT_CAMERA_WIDTH    	640 // Eclair Camera for zoom2
+#define DEFAULT_CAMERA_HEIGHT   	480 // Eclair Camera for zoom2
 
-#define DSP3630_KHZ_MIN 260000
-#define DSP3630_KHZ_MAX 800000
+#define ZEUS_CAMERA_WIDTH       	640 // Eclair Camera for zoom2
+#define ZEUS_CAMERA_HEIGHT      	480 // Eclair Camera for zoom2
 
-#define __ALIGN(x,a) ( (x) & (~((a) - 1)))
-#define NEXT_4K_ALIGN_ADDR(x) (((unsigned int) x + 0xfff) & 0xfffff000)
+#define OPEN_CLOSE_WORKAROUND	  	0
 
-#define NONNEG_ASSIGN(x,y) \
-    if(x > -1) \
-        y = x
+#define PIX_YUV422I 				0
+#define PIX_YUV420P 				1
+
+#ifndef max
+#define max(a,b) ({typeof(a) _a = (a); typeof(b) _b = (b); _a > _b ? _a : _b; })
+#define min(a,b) ({typeof(a) _a = (a); typeof(b) _b = (b); _a < _b ? _a : _b; })
+#endif
+
+#define PPM(str){ \
+	gettimeofday(&ppm, NULL); \
+	ppm.tv_sec = ppm.tv_sec - ppm_start.tv_sec; \
+	ppm.tv_sec = ppm.tv_sec * 1000000; \
+	ppm.tv_sec = ppm.tv_sec + ppm.tv_usec - ppm_start.tv_usec; \
+	LOGD("PPM: %s :%ld.%ld ms",str, ppm.tv_sec/1000, ppm.tv_sec%1000 ); \
+}
+
+#define HALO_ISO
 
 namespace android {
 
-#ifdef IMAGE_PROCESSING_PIPELINE
-    #define INPLACE_ON    1
-    #define INPLACE_OFF    0
-    #define IPP_Disabled_Mode 0
-    #define IPP_CromaSupression_Mode 1
-    #define IPP_EdgeEnhancement_Mode 2
-typedef struct OMX_IPP
-{
-    IPP_Handle hIPP;
-    IPP_ConfigurationTypes ippconfig;
-    IPP_CRCBSAlgoCreateParams CRCBptr;
-    IPP_EENFAlgoCreateParams EENFcreate;
-    IPP_YUVCAlgoCreateParams YUVCcreate;
-    void* dynStar;
-    void* dynCRCB;
-    void* dynEENF;
-    IPP_StarAlgoInArgs* iStarInArgs;
-    IPP_StarAlgoOutArgs* iStarOutArgs;
-    IPP_CRCBSAlgoInArgs* iCrcbsInArgs;
-    IPP_CRCBSAlgoOutArgs* iCrcbsOutArgs;
-    IPP_EENFAlgoInArgs* iEenfInArgs;
-    IPP_EENFAlgoOutArgs* iEenfOutArgs;
-    IPP_YUVCAlgoInArgs*  iYuvcInArgs1;
-    IPP_YUVCAlgoOutArgs* iYuvcOutArgs1;
-    IPP_YUVCAlgoInArgs* iYuvcInArgs2;
-    IPP_YUVCAlgoOutArgs* iYuvcOutArgs2;
-    IPP_StarAlgoStatus starStatus;
-    IPP_CRCBSAlgoStatus CRCBSStatus;
-    IPP_EENFAlgoStatus EENFStatus;
-    IPP_StatusDesc statusDesc;
-    IPP_ImageBufferDesc iInputBufferDesc;
-    IPP_ImageBufferDesc iOutputBufferDesc;
-    IPP_ProcessArgs iInputArgs;
-    IPP_ProcessArgs iOutputArgs;
-    int outputBufferSize;
-    unsigned char* pIppOutputBuffer;
-} OMX_IPP;
+#define DTP_FILE_NAME    						"/data/dyntunn.enc"
+#define EEPROM_FILE_NAME 						"/data/eeprom.hex"
+#define LIBICAPTURE_NAME 						"libicapture.so"
 
-typedef struct {
-    // Edge Enhancement Parameters
-    uint16_t  EdgeEnhancementStrength;
-    uint16_t  WeakEdgeThreshold;
-    uint16_t  StrongEdgeThreshold;
+#define	CAM_EXIF_DEFAULT_EXIF_MAKER_INFO		"SAMSUNG"
+#define	CAM_EXIF_DEFAULT_EXIF_MODEL_INFO		"ZOOM BOARD"
+#define	CAM_EXIF_DEFAULT_EXIF_SOFTWARE_INFO		"Eclair"
 
-    // Noise filter parameters
-    // LumaNoiseFilterStrength
-    uint16_t  LowFreqLumaNoiseFilterStrength;
-    uint16_t  MidFreqLumaNoiseFilterStrength;
-    uint16_t  HighFreqLumaNoiseFilterStrength;
+//#define LIB3AFW "libMMS3AFW.so"	// 3A FW
 
-    // CbNoiseFilterStrength
-    uint16_t  LowFreqCbNoiseFilterStrength;
-    uint16_t  MidFreqCbNoiseFilterStrength;
-    uint16_t  HighFreqCbNoiseFilterStrength;
+#define PHOTO_PATH 								"/sdcard/photo_%02d.%s"
 
-    // CrNoiseFilterStrength
-    uint16_t  LowFreqCrNoiseFilterStrength;
-    uint16_t  MidFreqCrNoiseFilterStrength;
-    uint16_t  HighFreqCrNoiseFilterStrength;
+#define START_CMD     							0x0
+#define STOP_CMD      							0x1
+#define RUN_CMD       							0x2
+#define TAKE_PICTURE  							0x3
+#define NOOP          							0x4
 
-    uint16_t  shadingVertParam1;
-    uint16_t  shadingVertParam2;
-    uint16_t  shadingHorzParam1;
-    uint16_t  shadingHorzParam2;
-    uint16_t  shadingGainScale;
-    uint16_t  shadingGainOffset;
-    uint16_t  shadingGainMaxValue;
+#define CAMERA_MODE    							1
+#define CAMCORDER_MODE 							2
+#define VT_MODE        							3
+#define Trd_PART       							4    
 
-    uint16_t  ratioDownsampleCbCr;
-} IPP_PARAMS;
+#define NEON
+#define SAMSUNG_SECURITY
 
-#endif
+#define ROTATEANGLE   							270
+#define VTROTATEANGLE 							90
 
-//icapture
-#define DTP_FILE_NAME         "/data/dyntunn.enc"
-#define EEPROM_FILE_NAME    "/data/eeprom.hex"
-#define LIBICAPTURE_NAME    "libicapture.so"
+#define CAMERA_DEVICE_ERROR_FOR_UNKNOWN    		1
+#define CAMERA_DEVICE_ERROR_FOR_RESTART    		-1000
+#define CAMERA_DEVICE_ERROR_FOR_EXIT       		-1001
+#define CAMERA_DEVICE_FIRMWAREUPDATE       		-100
+#define CAMERA_DEVICE_RESET_RESTART_COUNT  		-200
 
-// 3A FW
-#define LIB3AFW             "libMMS3AFW.so"
+#define CAMERA_AF_FAIL    						0
+#define CAMERA_AF_SUCCESS 						1
+#define CAMERA_AF_CANCEL  						2
 
-#define PHOTO_PATH          "/tmp/photo_%02d.%s"
+	struct imageInfo{
+		int mImageWidth;
+		int mImageHeight;
+	};
 
-enum {
-    PROC_MSG_IDX_ACTION = 0,
-    PROC_MSG_IDX_CAPTURE_W,
-    PROC_MSG_IDX_CAPTURE_H,
-    PROC_MSG_IDX_IMAGE_W,
-    PROC_MSG_IDX_IMAGE_H,
-    PROC_MSG_IDX_PIX_FMT,
-#ifdef IMAGE_PROCESSING_PIPELINE
-    PROC_MSG_IDX_IPP_EES,
-    PROC_MSG_IDX_IPP_WET,
-    PROC_MSG_IDX_IPP_SET,
-    PROC_MSG_IDX_IPP_LFLNFS,
-    PROC_MSG_IDX_IPP_MFLNFS,
-    PROC_MSG_IDX_IPP_HFLNFS,
-    PROC_MSG_IDX_IPP_LFCBNFS,
-    PROC_MSG_IDX_IPP_MFCBNFS,
-    PROC_MSG_IDX_IPP_HFCBNFS,
-    PROC_MSG_IDX_IPP_LFCRNFS,
-    PROC_MSG_IDX_IPP_MFCRNFS,
-    PROC_MSG_IDX_IPP_HFCRNFS,
-    PROC_MSG_IDX_IPP_SVP1,
-    PROC_MSG_IDX_IPP_SVP2,
-    PROC_MSG_IDX_IPP_SHP1,
-    PROC_MSG_IDX_IPP_SHP2,
-    PROC_MSG_IDX_IPP_SGS,
-    PROC_MSG_IDX_IPP_SGO,
-    PROC_MSG_IDX_IPP_SGMV,
-    PROC_MSG_IDX_IPP_RDSCBCR,
-    PROC_MSG_IDX_IPP_MODE,
-    PROC_MSG_IDX_IPP_TO_ENABLE,
-#endif
-    PROC_MSG_IDX_YUV_BUFF,
-    PROC_MSG_IDX_YUV_BUFFLEN,
-    PROC_MSG_IDX_ROTATION,
-    PROC_MSG_IDX_ZOOM,
-    PROC_MSG_IDX_JPEG_QUALITY,
-    PROC_MSG_IDX_JPEG_CB,
-    PROC_MSG_IDX_RAW_CB,
-    PROC_MSG_IDX_CB_COOKIE,
-    PROC_MSG_IDX_CROP_L,
-    PROC_MSG_IDX_CROP_T,
-    PROC_MSG_IDX_CROP_W,
-    PROC_MSG_IDX_CROP_H,
-    PROC_MSG_IDX_THUMB_W,
-    PROC_MSG_IDX_THUMB_H,
-#ifdef HARDWARE_OMX
-    PROC_MSG_IDX_EXIF_BUFF,
-#endif
-    PROC_MSG_IDX_MAX
-};
-#define PROC_THREAD_PROCESS         0x5
-#define PROC_THREAD_EXIT            0x6
+	class CameraHal : public CameraHardwareInterface {
+		public:
 
-#define SHUTTER_THREAD_CALL         0x1
-#define SHUTTER_THREAD_EXIT         0x2
-#define SHUTTER_THREAD_NUM_ARGS     3
-#define RAW_THREAD_CALL             0x1
-#define RAW_THREAD_EXIT             0x2
-#define RAW_THREAD_NUM_ARGS         4
-#define SNAPSHOT_THREAD_START       0x1
-#define SNAPSHOT_THREAD_EXIT        0x2
-#define SNAPSHOT_THREAD_START_GEN   0x3
+			//[ In "CameraHardwareInterface.h" functions
+			virtual sp<IMemoryHeap> getPreviewHeap() const ;
+			virtual sp<IMemoryHeap> getRawHeap() const;
 
-#define PAGE                    0x1000
-#define PARAM_BUFFER            512
+			virtual void  setCallbacks(notify_callback notify_cb,
+					data_callback data_cb,
+					data_callback_timestamp data_cb_timestamp,
+					void* user);
 
-#ifdef FW3A
+			virtual void enableMsgType(int32_t msgType);
+			virtual void disableMsgType(int32_t msgType);
+			virtual bool msgTypeEnabled(int32_t msgType);
 
-typedef struct {
-    TICam_Handle hnd;
+			virtual status_t startPreview();
 
-    /* hold 2A settings */
-    SICam_Settings settings;
+			virtual bool useOverlay() { return true; }
+			virtual status_t setOverlay(const sp<Overlay> &overlay);
+   
+			virtual void stopPreview();
+			virtual bool previewEnabled();
 
-    /* hold 2A status */
-    SICam_Status   status;
+			virtual status_t startRecording();  
+			virtual void stopRecording();
+			virtual bool recordingEnabled();
+			virtual void releaseRecordingFrame(const sp<IMemory>& mem);
 
-    /* hold MakerNote */
-    SICam_MakerNote mnote;
-} lib3atest_obj;
-#endif
+        	virtual status_t autoFocus(); 
+			virtual status_t cancelAutoFocus();
 
-#ifdef ICAP
-typedef struct{
-    void           *lib_private;
-    icap_configure_t    cfg;
-    icap_tuning_params_t tuning_pars;
-    SICap_ManualParameters manual;
-    icap_buffer_t   img_buf;
-    icap_buffer_t   lsc_buf;
-} libtest_obj;
-#endif
+			virtual status_t takePicture();		
+			virtual status_t cancelPicture();	
 
-typedef struct {
-    size_t width;
-    size_t height;
-} supported_resolution;
+			virtual status_t setParameters(const CameraParameters& params);
+			virtual CameraParameters getParameters() const;
 
-class CameraHal : public CameraHardwareInterface {
-public:
-    virtual sp<IMemoryHeap> getRawHeap() const;
-    virtual void stopRecording();
+			virtual status_t sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
+			virtual void release();
+			virtual status_t dump(int fd, const Vector<String16>& args) const;
+			//] In "CameraHardwareInterface.h" functions
 
-    virtual status_t startRecording();  // Eclair HAL
-    virtual bool recordingEnabled();
-    virtual void releaseRecordingFrame(const sp<IMemory>& mem);
-    virtual sp<IMemoryHeap> getPreviewHeap() const ;
+			static int beginAutoFocusThread(void *cookie);
+			virtual void autoFocusThread();
+			static int beginCancelAutoFocusThread(void *cookie);
+			virtual void cancelAutoFocusThread();
+			void dumpFrame(void *buffer, int size, char *path);
+			void initDefaultParameters(int cameraId);
+			static sp<CameraHardwareInterface> createInstance(int cameraId);
 
-    virtual status_t startPreview();   //  Eclair HAL
-    virtual bool useOverlay() { return true; }
-    virtual status_t setOverlay(const sp<Overlay> &overlay);
-    virtual void stopPreview();
-    virtual bool previewEnabled();
+			virtual void DrawHorizontalLineForOverlay(int yAxis, int xLeft, int xRight, uint8_t yValue, uint8_t cbValue, uint8_t crValue, int previewWidth, int previewHeight);
+			virtual void DrawVerticalLineForOverlay(int xAxis, int yTop, int yBottom, uint8_t yValue, uint8_t cbValue, uint8_t crValue, int previewWidth, int previewHeight);
+			virtual void DrawHorizontalLineMixedForOverlay(int row, int col, int size, uint8_t yValue, uint8_t cbValue, uint8_t crValue, int fraction, int previewWidth, int previewHeight);
 
-    virtual status_t autoFocus();  // Eclair HAL
+		private:
 
+			class PreviewThread : public Thread {
+				CameraHal* mHardware;
+				int camId;
+				public:
+				PreviewThread(CameraHal* hw, int cameraId)
+					: Thread(false), mHardware(hw), camId(cameraId) { }
 
-    virtual status_t takePicture();        // Eclair HAL
+				virtual bool threadLoop() {
+					mHardware->previewThread(camId);
+					return false;
+				}
+			};
 
-    virtual status_t cancelPicture();    // Eclair HAL
-    virtual status_t cancelAutoFocus();
+			class ProcThread : public Thread {
+				CameraHal *mHardware;
+				public:
+				ProcThread(CameraHal *hw) : Thread(false), mHardware(hw) {}
+				virtual bool threadLoop(){
+					mHardware->procThread();
+					return false;			
+				}
+			};
 
-    virtual status_t dump(int fd, const Vector<String16>& args) const;
-    void dumpFrame(void *buffer, int size, char *path);
-    virtual status_t setParameters(const CameraParameters& params);
-    virtual CameraParameters getParameters() const;
-    virtual void release();
-    void initDefaultParameters();
+			class FacetrackingThread : public Thread{
+				CameraHal *mHardware;
+				public:
+				FacetrackingThread(CameraHal *hw) : Thread(false), mHardware(hw) {}
+				virtual bool threadLoop(){
+					mHardware->facetrackingThread();
+					return false;
+				}
+			};
 
-/*--------------------Eclair HAL---------------------------------------*/
-     virtual void        setCallbacks(notify_callback notify_cb,
-                                     data_callback data_cb,
-                                     data_callback_timestamp data_cb_timestamp,
-                                     void* user);
+			static int onSaveH3A(void *priv, void *buf, int size);
+			static int onSaveLSC(void *priv, void *buf, int size);
+			static int onSaveRAW(void *priv, void *buf, int size);
 
-    virtual void        enableMsgType(int32_t msgType);
-    virtual void        disableMsgType(int32_t msgType);
-    virtual bool        msgTypeEnabled(int32_t msgType);
-/*--------------------Eclair HAL---------------------------------------*/
-    static sp<CameraHardwareInterface> createInstance(int cameraId);
+			CameraHal(int cameraId);
+			virtual ~CameraHal();
+			void previewThread(int cameraId);
+			static int beginPictureThread(void *cookie);
 
-    virtual status_t sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
+			int validateSize(int w, int h);	
+			void drawRect(uint8_t *input, uint8_t color, int x1, int y1, int x2, int y2, int width, int height);
+			void procThread();
+			void facetrackingThread();
 
-    class PreviewThread : public Thread {
-        CameraHal* mHardware;
-    public:
-        PreviewThread(CameraHal* hw)
-            : Thread(false), mHardware(hw) { }
+			//Eclair Camera L25.12
+			int ZoomPerform(int zoom); //Eclair Camera L25.14, &L25.12
+			//Eclair Camera L25.12
 
-        virtual bool threadLoop() {
-            mHardware->previewThread();
-
-            return false;
-        }
-    };
-
-    class SnapshotThread : public Thread {
-        CameraHal* mHardware;
-    public:
-        SnapshotThread(CameraHal* hw)
-            : Thread(false), mHardware(hw) { }
-
-        virtual bool threadLoop() {
-            mHardware->snapshotThread();
-            return false;
-        }
-    };
-
-    class PROCThread : public Thread {
-        CameraHal* mHardware;
-    public:
-        PROCThread(CameraHal* hw)
-            : Thread(false), mHardware(hw) { }
-
-        virtual bool threadLoop() {
-            mHardware->procThread();
-            return false;
-        }
-    };
-
-    class ShutterThread : public Thread {
-        CameraHal* mHardware;
-    public:
-        ShutterThread(CameraHal* hw)
-            : Thread(false), mHardware(hw) { }
-
-        virtual bool threadLoop() {
-            mHardware->shutterThread();
-            return false;
-        }
-    };
-
-    class RawThread : public Thread {
-        CameraHal* mHardware;
-    public:
-        RawThread(CameraHal* hw)
-            : Thread(false), mHardware(hw) { }
-
-        virtual bool threadLoop() {
-            mHardware->rawThread();
-            return false;
-        }
-    };
-
-   CameraHal(int cameraId);
-    virtual ~CameraHal();
-    void previewThread();
-    bool validateSize(size_t width, size_t height, const supported_resolution *supRes, size_t count);
-    bool validateRange(int min, int max, const char *supRang);
-    void procThread();
-    void shutterThread();
-    void rawThread();
-    void snapshotThread();
-    void *getLastOverlayAddress();
-    size_t getLastOverlayLength();
-
-#ifdef IMAGE_PROCESSING_PIPELINE
-
-    IPP_PARAMS mIPPParams;
-
-#endif
-
-#ifdef FW3A
-#ifdef IMAGE_PROCESSING_PIPELINE
-    static void onIPP(void *priv, icap_ipp_parameters_t *ipp_params);
-#endif
-    static void onMakernote(void *priv, void *mknote_ptr);
-    static void onShutter(void *priv, icap_image_buffer_t *image_buf);
-    static void onSaveH3A(void *priv, icap_image_buffer_t *buf);
-    static void onSaveLSC(void *priv, icap_image_buffer_t *buf);
-    static void onSaveRAW(void *priv, icap_image_buffer_t *buf);
-    static void onSnapshot(void *priv, icap_image_buffer_t *buf);
-    static void onGeneratedSnapshot(void *priv, icap_image_buffer_t *buf);
-    static void onCrop(void *priv,  icap_crop_rect_t *crop_rect);
-
-    int FW3A_Create();
-    int FW3A_Init();
-    int FW3A_Release();
-    int FW3A_Destroy();
-    int FW3A_Start();
-    int FW3A_Stop();
-    int FW3A_Start_CAF();
-    int FW3A_Stop_CAF();
-    int FW3A_Start_AF();
-    int FW3A_Stop_AF();
-    int FW3A_GetSettings() const;
-    int FW3A_SetSettings();
-
-#endif
-
-    int CorrectPreview();
-    int ZoomPerform(float zoom);
-    void nextPreview();
-    void queueToOverlay(int index);
-    int dequeueFromOverlay();
-    bool __queueToCamera(int index, int line);
+			void nextPreview();
+            void queueToOverlay(int index);
+            int dequeueFromOverlay();
+            bool __queueToCamera(int index, int line);
 #define queueToCamera(x) __queueToCamera(x, __LINE__)
-    int dequeueFromCamera(nsecs_t *timestamp);
-    int ICapturePerform();
-    int ICaptureCreate(void);
-    int ICaptureDestroy(void);
-    void SetDSPKHz(unsigned int KHz);
-    void PPM(const char *);
-    void PPM(const char *, struct timeval*, ...);
-    status_t convertGPSCoord(double coord, int *deg, int *min, int *sec);
+            int dequeueFromCamera(nsecs_t *timestamp);
+			int ICapturePerform();
+			int ICaptureCreate(void);
+			int ICaptureDestroy(void);
+			int CapturePicture();
+			
+			//[for EXIF
+			void CreateExif(unsigned char* pInThumbnailData,int Inthumbsize,unsigned char* pOutExifBuf,int& OutExifSize,int flag);
+			bool CreateJpegWithExif(unsigned char* pInJpegData, int InJpegSize,unsigned char* pInExifBuf,
+					int InExifSize,unsigned char* pOutJpegData, int& OutJpegSize);	
+			int GetJpegImageSize();
+			int GetThumbNailDataSize();
+			int GetThumbNailOffset();
+			int GetYUVOffset();
+			int GetJPEG_Capture_Width();
+			int GetJPEG_Capture_Height();
+			int GetCamera_version();		
+			void convertFromDecimalToGPSFormat(double,int&,int&,double&);
+			void getExifInfoFromDriver(v4l2_exif* );
+			int convertToExifLMH(int, int);
+			//]
+			
+			int CameraCreate(int );
+			int CameraDestroy();
+			int CameraConfigure();	
+			int CameraSetFrameRate();
+			int initCameraSetFrameRate();
+			int CameraStart();
+			int CameraStop();
+			int SaveFile(char *filename, char *ext, void *buffer, int jpeg_size);
 
-//  SAMSUNG START
-    int mPreviousZoom;
-    status_t setZoom(int zoom);
-//  SAMSUNG END
+			int isStart_JPEG;
+			int isStart_VPP;
+			int isStart_Scale;
 
+			status_t setWB(const char* wb);
+			status_t setEffect(const char* effect);
+			status_t setAntiBanding(const char* antibanding);
+			status_t setSceneMode(const char* scenemode);
+			status_t setFlashMode(const char* flashmode);
+			status_t setMovieFlash(int flag);
+			status_t setBrightness(int brightness);
+			status_t setExposure(int exposure);
+			status_t setZoom(int zoom);
 
-#ifdef IMAGE_PROCESSING_PIPELINE
-
-    int DeInitIPP(int ippMode);
-    int InitIPP(int w, int h, int fmt, int ippMode);
-    int PopulateArgsIPP(int w, int h, int fmt, int ippMode);
-    int ProcessBufferIPP(void *pBuffer, long int nAllocLen, int fmt, int ippMode,
-                       int EdgeEnhancementStrength, int WeakEdgeThreshold, int StrongEdgeThreshold,
-                        int LowFreqLumaNoiseFilterStrength, int MidFreqLumaNoiseFilterStrength, int HighFreqLumaNoiseFilterStrength,
-                        int LowFreqCbNoiseFilterStrength, int MidFreqCbNoiseFilterStrength, int HighFreqCbNoiseFilterStrength,
-                        int LowFreqCrNoiseFilterStrength, int MidFreqCrNoiseFilterStrength, int HighFreqCrNoiseFilterStrength,
-                        int shadingVertParam1, int shadingVertParam2, int shadingHorzParam1, int shadingHorzParam2,
-                        int shadingGainScale, int shadingGainOffset, int shadingGainMaxValue,
-                        int ratioDownsampleCbCr);
-    OMX_IPP pIPP;
-
-#endif   
-
-    int CameraCreate();
-    int CameraDestroy(bool destroyOverlay);
-    int CameraConfigure();
-    int CameraSetFrameRate();
-    int CameraStart();
-    int CameraStop();
-
-    int allocatePictureBuffers(size_t length, int burstCount);
-    int freePictureBuffers(void);
-
-    int SaveFile(char *filename, char *ext, void *buffer, int jpeg_size);
-    
-    int isStart_FW3A;
-    int isStart_FW3A_AF;
-    int isStart_FW3A_CAF;
-    int isStart_FW3A_AEWB;
-    int isStart_VPP;
-    int isStart_JPEG;
-    int FW3A_AF_TimeOut;
-
-    mutable Mutex mLock;
-    int mBurstShots;
-    struct v4l2_crop mInitialCrop;
-
-#ifdef HARDWARE_OMX
-
-    gps_data *gpsLocation;
-    exif_params mExifParams;
-
+#ifdef HALO_ISO
+			status_t setISO(const char* iso);
+#else
+			void setISO(int iso);
 #endif
+			status_t setContrast(int contrast);
+			status_t setSaturation(int saturation);
+			status_t setSharpness(int sharpness);
+			status_t setWDRMode(int wdr);
+			status_t setAntiShakeMode(int antiShake);
+			status_t setFocusMode(const char* focus);
+			status_t setMetering(const char* metering);
+			status_t setPrettyMode(int pretty);
+			status_t setJpegMainimageQuality(int quality);
+			status_t setGPSLatitude(double gps_latitude);
+			status_t setGPSLongitude(double gps_longitude);
+			status_t setGPSAltitude(double gps_altitude);
+			status_t setGPSTimestamp(long gps_timestamp);
+			status_t setGPSProcessingMethod(const char *gps_processingmethod);
+			status_t setJpegThumbnailSize(imageInfo imgInfo);
 
-    bool mShutterEnable;
-    bool mCAFafterPreview;
-    bool useMaxCrop;
-    float zoomAspRatio;
-    CameraParameters mParameters;
-    sp<MemoryHeapBase> mPictureHeap, mJPEGPictureHeap;
-    int mJPEGOffset, mJPEGLength;
-    unsigned int mYuvBufferLen[MAX_BURST];
-    void *mYuvBuffer[MAX_BURST];
-    int  mPreviewFrameSize;
-    sp<Overlay>  mOverlay;
-    sp<PreviewThread>  mPreviewThread;
-    sp<PROCThread>  mPROCThread;
-    sp<ShutterThread> mShutterThread;
-    sp<RawThread> mRawThread;
-    sp<SnapshotThread> mSnapshotThread;
-    bool mPreviewRunning;
-    bool mIPPInitAlgoState;
-    bool mIPPToEnable;
-    Mutex mRecordingLock;
-    int mRecordingFrameSize;
-    // Video Frame Begin
-    int mVideoBufferCount;
-    sp<MemoryHeapBase> mVideoHeaps[VIDEO_FRAME_COUNT_MAX];
-    sp<MemoryBase> mVideoBuffer[VIDEO_FRAME_COUNT_MAX];
+			enum AE_AWB_LOCK_UNLOCK
+			{
+				AE_UNLOCK_AWB_UNLOCK = 0,
+				AE_LOCK_AWB_UNLOCK,
+				AE_UNLOCK_AWB_LOCK,
+				AE_LOCK_AWB_LOCK,
+				AE_AWB_MAX
+			};
+			
+			int setAEAWBLockUnlock(int, int );
+			int setObjectPosition(int, int);
+			int setFaceDetectLockUnlock(int );
+			int setObjectTrackingStartStop(int );
+			int setTouchAFStartStop(int );
+			int setDefultIMEI(int );		
+			int setCAFStart(int );	
+			int setCAFStop(int );		
+
+			int m_touch_af_start_stop;
+			int m_focus_mode;
+			int m_iso;
+			int m_default_imei;
+
+			void setDatalineCheckStart();
+			void setDatalineCheckStop();
+			void setCameraMode(int32_t mode);	
+			void setSamsungCamera();			
+
+			const char *getEffect() const;
+
+			/* White Balance Lighting Conditions */
+			const char *getWBLighting() const;
+
+			/* Anti Banding */
+			const char *getAntiBanding() const;
+			const char *getSceneMode() const;
+			const char *getFlashMode() const;
+
+			/* Main image quality */
+			int getJpegMainimageQuality() const;
+			
+			/* Brightness control */
+			int getBrightness() const;
+			int getExposure() const;
+
+			/* Digital Zoom control */
+			int getZoomValue() const;
+			
+			double getGPSLatitude() const;
+			double getGPSLongitude() const;
+			double getGPSAltitude() const;
+			long getGPSTimestamp() const;
+			const char *getGPSProcessingMethod() const;		
+			
+#ifdef HALO_ISO    
+			const char *getISO() const;
+#else
+			int getISO() const;
+#endif
+			int getContrast() const;
+			int getSaturation() const;
+			int getSharpness() const;
+			int getWDRMode() const;
+			int getAntiShakeMode() const;
+			const char *getFocusMode() const;
+			const char *getMetering() const;
+
+			int getCameraSelect() const;
+			int getCamcorderPreviewValue() const;
+			int getVTMode() const;
+			int getPrettyValue() const;
+			int getPreviewFrameSkipValue() const;
+
+			void setDriverState(int state);
+			void mirrorForVTC(unsigned char * aSrcBufPtr, unsigned char * aDstBufPtr,int  aFramewidth,int  aFrameHeight);
+			int getTwoSecondReviewMode() const;
+			int getPreviewFlashOn() const;
+			int getCropValue() const;
+			int checkFirmware();
+			int getSamsungCameraValue() const;
+			void rotate90_out(unsigned char *pInputBuf, unsigned char *pOutputBuf,int w, int h);
+			int getOrientation() const;
+			imageInfo getJpegThumbnailSize() const;
+#ifdef EVE_CAM		
+			void DrawOverlay(uint8_t *pBuffer, bool bCopy);
+			void PreviewConversion(uint8_t *pInBuffer, uint8_t *pOutBuffer);
+#endif
+#ifdef SAMSUNG_SECURITY
+			int getSecurityCheck(void);
+#endif
+			mutable Mutex mLock;
+			CameraParameters mParameters;
+			sp<MemoryHeapBase> mPictureHeap;
+			sp<MemoryHeapBase> mJPEGPictureHeap;
+			int mPictureOffset, mJPEGOffset, mJPEGLength, mPictureLength;
+			void *mYuvBuffer, *mJPEGBuffer;
+
+			//[20091216 Ratnesh NEC
+			sp<MemoryHeapBase> mFinalPictureHeap;
+			sp<MemoryHeapBase> mYUVPictureHeap;
+			sp<MemoryBase> mYUVPictureBuffer;
+			sp<IMemoryHeap> newheap;
+			//]
+			sp<MemoryHeapBase> mVGAYUVPictureHeap;
+			sp<MemoryBase> mVGAYUVPictureBuffer;
+			sp<IMemoryHeap> mVGANewheap;
+
+			int iOutStandingBuffersWithEncoder;
+			int iConsecutiveVideoFrameDropCount;
+
+			int  mPreviewFrameSize;
+			sp<Overlay>  mOverlay;
+			sp<PreviewThread>  mPreviewThread;
+			bool mPreviewRunning;
+			Mutex               mRecordingLock;
+			int mRecordingFrameSize;
+			// Video Frame Begin
+			int                 mVideoBufferCount;
+			sp<MemoryHeapBase>  mVideoHeap;
+#ifdef EVE_CAM		
+			sp<MemoryHeapBase>  mVideoHeap_422;
+			sp<MemoryHeapBase>  mVideoHeaps_422;
+			sp<MemoryBase>		mVideoBuffer_422[VIDEO_FRAME_COUNT_MAX];
+#endif		
+			sp<MemoryHeapBase>  mVideoHeaps[VIDEO_FRAME_COUNT_MAX];
+			sp<MemoryBase>      mVideoBuffer[VIDEO_FRAME_COUNT_MAX];
+#ifdef VT_BACKGROUND_SOLUTION
+			sp<MemoryHeapBase>  mVTHeaps[VIDEO_FRAME_COUNT_MAX];
+			sp<MemoryBase>      mVTBuffer[VIDEO_FRAME_COUNT_MAX];
+#endif
+			sp<MemoryHeapBase>  mVideoConversionHeap;
+			sp<MemoryBase>      mVideoConversionBuffer[VIDEO_FRAME_COUNT_MAX];
+			sp<MemoryHeapBase>  mHeapForRotation;
+			sp<MemoryBase>      mBufferForRotation;
+			v4l2_buffer         mfilledbuffer[VIDEO_FRAME_COUNT_MAX];
+			unsigned long       mVideoBufferPtr[VIDEO_FRAME_COUNT_MAX];
+			int                 mVideoBufferUsing[VIDEO_FRAME_COUNT_MAX];
+			int                 mRecordingFrameCount;
+			void*               mPreviewBlocks[VIDEO_FRAME_COUNT_MAX];
 
 #define BUFF_IDLE       (0)
 #define BUFF_Q2DSS      (1)
 #define BUFF_Q2VE       (1<<1)
-    int                 mVideoBufferStatus[MAX_CAMERA_BUFFERS];
+
 #ifdef DEBUG_LOG
     void debugShowBufferStatus();
 #else
 #define debugShowBufferStatus()
 #endif
+		
+			int nOverlayBuffersQueued;
+			int nCameraBuffersQueued;
+			struct v4l2_buffer v4l2_cam_buffer[MAX_CAMERA_BUFFERS];
+			int buffers_queued_to_dss[MAX_CAMERA_BUFFERS];
+			int buffers_queued_to_camera_driver[MAX_CAMERA_BUFFERS];   // Added for CSR - OMAPS00242402
 
-    //Index of current camera adapter
-    int mCameraIndex;
-    // ...
-    int nOverlayBuffersQueued;
-    int nCameraBuffersQueued;
-    struct v4l2_buffer v4l2_cam_buffer[MAX_CAMERA_BUFFERS];
-    sp<MemoryHeapBase> mPreviewHeaps[MAX_CAMERA_BUFFERS];
-    sp<MemoryBase> mPreviewBuffers[MAX_CAMERA_BUFFERS];
-    int mfirstTime;
-    static wp<CameraHardwareInterface> singleton[MAX_CAMERAS_SUPPORTED];
-    static int camera_device;
-    static const supported_resolution supportedPreviewRes[];
-    static const supported_resolution supportedPictureRes[];
-    static const char supportedPictureSizes[];
-    static const char supportedPictureSizesSecondary[];
-    static const char supportedPreviewSizes[];
-    static const char supportedPreviewSizesSecondary[];
-    static const char supportedFPS[];
-    static const char supportedFpsRanges[];
-    static const char supportedFPSSecondary[];
-    static const char supportedFpsRangesSecondary[];
-    static const char supportedThumbnailSizes[];
-    char focusDistances[FOCUS_DISTANCE_BUFFER_SIZE];
-    static const char PARAMS_DELIMITER[];
-    int procPipe[2], shutterPipe[2], rawPipe[2], snapshotPipe[2], snapshotReadyPipe[2];
-    int mippMode;
-    int pictureNumber;
-    bool mCaptureRunning;
-    int rotation;
-#if PPM_INSTRUMENTATION || PPM_INSTRUMENTATION_ABS
-    struct timeval ppm;
-    struct timeval ppm_start;
-    struct timeval ppm_receiveCmdToTakePicture;
-    struct timeval ppm_restartPreview;
-    struct timeval focus_before, focus_after;
-    struct timeval ppm_before, ppm_after;
-    struct timeval ipp_before, ipp_after;
+			bool mDSSActive;	// OVL_PATCH
+			
+			int nBuffToStartDQ;
+			int mfirstTime;
+			static wp<CameraHardwareInterface> singleton;
+			static int camera_device;
+			struct timeval ppm;
+			struct timeval ppm_start;
+
+			int mippMode;
+			int pictureNumber;
+			int rotation; 
+			struct timeval take_before, take_after;
+			struct timeval focus_before, focus_after;
+			struct timeval ppm_before, ppm_after;
+			struct timeval ipp_before, ipp_after;
+			struct v4l2_buffer mCfilledbuffer;
+			int lastOverlayIndex;
+			int lastOverlayBufferDQ;
+#ifdef EVE_CAM
+			int mBufferCount_422;				
+#endif 	
+
+			/*--------------Eclair Camera HAL---------------------*/	
+			notify_callback 			mNotifyCb;
+			data_callback   			mDataCb;
+			data_callback_timestamp 	mDataCbTimestamp;
+			void                 		*mCallbackCookie;
+			int32_t	mMsgEnabled;
+			bool    mRecordEnabled; 
+			nsecs_t mCurrentTime;   
+			bool mFalsePreview;
+			bool mRecorded;
+			bool mAutoFocusRunning;	
+			int mPreviousWB;
+			int mPreviousEffect;
+			int mPreviousAntibanding;
+			int mPreviousSceneMode;
+			int mPreviousFlashMode;
+			int mPreviousBrightness;
+			int mPreviousExposure;
+			int mPreviousZoom;
+			int mPreviousIso;
+			int mPreviousContrast;
+			int mPreviousSaturation;
+			int mPreviousSharpness;
+			int mPreviousWdr;
+			int mPreviousAntiShake;
+			int mPreviousFocus;
+			int mPreviousMetering;
+			int m_chk_dataline;
+			bool m_chk_dataline_end;
+			bool mAFState;
+			bool mCaptureFlag;
+			int mCamera_Mode;
+			int mCameraIndex;
+			int mPreviousPretty;
+			int mPreviousQuality;
+			int mYcbcrQuality;
+			bool mASDMode;
+			int mPreviewFrameSkipValue;
+
+            sp<MemoryHeapBase> mPreviewHeaps[MAX_CAMERA_BUFFERS];
+            sp<MemoryBase> mPreviewBuffers[MAX_CAMERA_BUFFERS];
+
+			int32_t mCameraMode;
+			bool mSamsungCamera;		
+			int mCamMode;		
+			int mCounterSkipFrame;
+			int mSkipFrameNumber;
+			unsigned int mPassedFirstFrame;
+			unsigned int mOldResetCount;
+			int mPreviousFlag;
+			int dequeue_from_dss_failed;	
+#ifdef HALO_ISO
+			int mPreviousISO;
 #endif
-    int lastOverlayBufferDQ;
+			int mPreviewWidth;
+			int mPreviewHeight;
+#ifdef SAMSUNG_SECURITY
+			int m_cur_security;
+			int m_security;
+#endif
 
-/*--------------Eclair Camera HAL---------------------*/
+			/*--------------Eclair Camera HAL---------------------*/
+#ifdef CAMERA_ALGO
+			struct timeval algo_before, algo_after;
+			int lastOverlayIndex;
+			CameraAlgo *camAlgos;
+			status_t initAlgos();
+#endif
 
-    notify_callback mNotifyCb;
-    data_callback   mDataCb;
-    data_callback_timestamp mDataCbTimestamp;
-    void                 *mCallbackCookie;
-
-    int32_t             mMsgEnabled;
-    bool                mRecordEnabled;
-    bool mFalsePreview;
-
-
-/*--------------Eclair Camera HAL---------------------*/
-
+#ifdef OMAP_ENHANCEMENT	  
 #ifdef HARDWARE_OMX
-    JpegEncoder*    jpegEncoder;
+			JpegEncoder*    jpegEncoder;
+#ifdef jpeg_decoder
+			JpegDecoder*    jpegDecoder;
 #endif    
-    
-#ifdef FW3A
-      lib3atest_obj *fobj;
+#endif    
 #endif
+			int file_index;
+			int cmd;
+			int quality;
+			unsigned int sensor_width;
+			unsigned int sensor_height;
+			unsigned int zoom_width;
+			unsigned int zoom_height;
+			int mflash;
+			int mred_eye;
+			int mcapture_mode;
+			int mzoom;
+			int mcaf;
+			int j;
+			int myuv;
+			int mMMSApp;
 
-#ifdef ICAP
-    libtest_obj   *iobj;
+			NEON_fpo Neon_Rotate;
+			NEON_FUNCTION_ARGS* neon_args;
+			void* pTIrtn;
+
+			enum PreviewThreadCommands {
+
+				// Comands       
+				PREVIEW_START,
+				PREVIEW_STOP,
+				PREVIEW_AF_START,
+				PREVIEW_AF_CANCEL,
+				PREVIEW_AF_STOP,
+				PREVIEW_CAPTURE,
+				PREVIEW_CAPTURE_CANCEL,
+				PREVIEW_KILL,
+				PREVIEW_CAF_START,
+				PREVIEW_CAF_STOP,
+				PREVIEW_FPS,
+				ZOOM_UPDATE,           
+				// ACKs        
+				PREVIEW_ACK,
+				PREVIEW_NACK,
+				CAPTURE_ACK,
+				CAPTURE_NACK,
+			};
+
+			enum ProcessingThreadCommands {
+
+				// Comands        
+				PROCESSING_PROCESS,
+				PROCESSING_CANCEL,
+				PROCESSING_KILL,
+
+				// ACKs        
+				PROCESSING_ACK,
+				PROCESSING_NACK,
+			};    
+
+			enum COMMAND_DEFINE
+			{
+				COMMAND_AE_AWB_LOCK_UNLOCK 			= 1101,
+				COMMAND_FACE_DETECT_LOCK_UNLOCK 	= 1102,
+				COMMAND_OBJECT_POSITION 			= 1103,
+				COMMAND_OBJECT_TRACKING_STARTSTOP 	= 1104,
+				COMMAND_TOUCH_AF_STARTSTOP 			= 1105,
+				COMMAND_CHECK_DATALINE 				= 1106,
+				COMMAND_DEFAULT_IMEI 				= 1107,
+			};
+
+			MessageQueue    previewThreadCommandQ;
+			MessageQueue    previewThreadAckQ;    
+			MessageQueue    processingThreadCommandQ;
+			MessageQueue    processingThreadAckQ;
+
+			mutable Mutex takephoto_lock;
+			uint8_t *yuv_buffer, *jpeg_buffer, *vpp_buffer, *ancillary_buffer;
+			int capture_len, yuv_len, jpeg_len, ancillary_len;
+#ifdef FOCUS_RECT
+			/* Focus rectangle  flags */
+			int focus_rect_set;
+			int focus_rect_color;
 #endif
-
-    int file_index;
-    int cmd;
-    int quality;
-    unsigned int sensor_width;
-    unsigned int sensor_height;
-    unsigned int zoom_width;
-    unsigned int zoom_height;
-    int32_t mImageCropTop, mImageCropLeft, mImageCropWidth, mImageCropHeight;
-    int mflash;
-    int mred_eye;
-    int mcapture_mode;
-    int mZoomCurrentIdx, mZoomTargetIdx, mZoomSpeed;
-    int mcaf;
-    int j;
-    bool useFramerateRange;
-
-    enum SmoothZoomStatus {
-        SMOOTH_START = 0,
-        SMOOTH_NOTIFY_AND_STOP,
-        SMOOTH_STOP
-    } mSmoothZoomStatus;
-
-    enum PreviewThreadCommands {
-
-        // Comands        
-        PREVIEW_START,
-        PREVIEW_STOP,
-        PREVIEW_AF_START,
-        PREVIEW_AF_STOP,
-        PREVIEW_CAPTURE,
-        PREVIEW_CAPTURE_CANCEL,
-        PREVIEW_KILL,
-        PREVIEW_CAF_START,
-        PREVIEW_CAF_STOP,
-        PREVIEW_FPS,
-        START_SMOOTH_ZOOM,
-        STOP_SMOOTH_ZOOM,
-        // ACKs        
-        PREVIEW_ACK,
-        PREVIEW_NACK,
-
-    };
-
-    enum ProcessingThreadCommands {
-
-        // Comands        
-        PROCESSING_PROCESS,
-        PROCESSING_CANCEL,
-        PROCESSING_KILL,
-
-        // ACKs        
-        PROCESSING_ACK,
-        PROCESSING_NACK,
-    };    
-
-    MessageQueue    previewThreadCommandQ;
-    MessageQueue    previewThreadAckQ;    
-    MessageQueue    processingThreadCommandQ;
-    MessageQueue    processingThreadAckQ;
-
-    mutable Mutex takephoto_lock;
-    uint8_t *yuv_buffer, *jpeg_buffer, *vpp_buffer, *ancillary_buffer;
-    
-    int yuv_len, jpeg_len, ancillary_len;
-
-    FILE *foutYUV;
-    FILE *foutJPEG;
-};
-
-}; // namespace android
+			double mPreviousGPSLatitude;
+			double mPreviousGPSLongitude;
+			double mPreviousGPSAltitude;
+			long mPreviousGPSTimestamp;
+			struct tm *m_timeinfo;
+			char m_gps_date[11];
+			time_t m_gps_time;
+			int m_gpsHour;
+			int m_gpsMin;
+			int m_gpsSec;
+			char mPreviousGPSProcessingMethod[150];
+			int mThumbnailWidth;
+			int mThumbnailHeight;
+	};
+}; // end of namespace android
 
 extern "C" {
-
-    int aspect_ratio_calc(
-        unsigned int sens_width,  unsigned int sens_height,
-        unsigned int pix_width,   unsigned int pix_height,
-        unsigned int src_width,   unsigned int src_height,
-        unsigned int dst_width,   unsigned int dst_height,
-        unsigned int align_crop_width, unsigned int align_crop_height,
-        unsigned int align_pos_width,  unsigned int align_pos_height,
-        int *crop_src_left,  int *crop_src_top,
-        int *crop_src_width, int *crop_src_height,
-        int *pos_dst_left,   int *pos_dst_top,
-        int *pos_dst_width,  int *pos_dst_height,
-        unsigned int flags);
-
-    int scale_init(int inWidth, int inHeight, int outWidth, int outHeight, int inFmt, int outFmt);
-    int scale_deinit();
-    int scale_process(void* inBuffer, int inWidth, int inHeight, void* outBuffer, int outWidth, int outHeight, int rotation, int fmt, float zoom, int crop_top, int crop_left, int crop_width, int crop_height);
+	int scale_init(int inWidth, int inHeight, int outWidth, int outHeight, int inFmt, int outFmt);
+	int scale_deinit();
+	int scale_process(void* inBuffer, int inWidth, int inHeight, void* outBuffer, int outWidth, int outHeight, int rotation, int fmt, float zoom);
 }
 
+extern "C" {
+	int ColorConvert_Init(int , int , int);
+	int ColorConvert_Deinit();
+	int ColorConvert_Process(char *, char *);
+
+	void Neon_Convert_yuv422_to_NV21(unsigned char * aSrcBufPtr, unsigned char * aDstBufPtr,unsigned int  aFramewidth,unsigned int  aFrameHeight);
+	void Neon_Convert_yuv422_to_NV12(unsigned char * aSrcBufPtr, unsigned char * aDstBufPtr,unsigned int  aFramewidth,unsigned int  aFrameHeight);
+	void Neon_Convert_yuv422_to_YUV420P(unsigned char * aSrcBufPtr, unsigned char * aDstBufPtr,unsigned int  aFramewidth,unsigned int  aFrameHeight);
+}
 #endif

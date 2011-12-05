@@ -1765,7 +1765,6 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 }
 
 /* ----------------------- END TI SOURCES ----------------------- */
-
 	/*
 	//NCB-TI
 	New nextPreview() code is to make CameraHal compatible with the Inc3.4 Overlay module. 
@@ -1775,16 +1774,14 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 	 */
 	void CameraHal::nextPreview()
 	{
-		const int RETRY_COUNT = 5;
+		bool queueBufferCheck = true;
+
+		int ret, error = 0;
+
+		mapping_data_t* data = NULL; 
 		mCfilledbuffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		mCfilledbuffer.memory = V4L2_MEMORY_USERPTR;
-		int ret, queue_to_dss_failed, nBuffers_queued_to_dss;
-		overlay_buffer_t overlaybuffer;// contains the index of the buffer dque
-		int index;
-		int buffer_count;    
-		mapping_data_t* data = NULL; 
-		bool queueBufferCheck = true;
-		int error = 0;
+		overlay_buffer_t overlaybuffer;	//contains the index of the buffer deque
 
 #ifdef SAMSUNG_SECURITY
 		if(!mSamsungCamera)
@@ -1801,10 +1798,43 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 			else
 			{
 				m_cur_security++;
-				//LOGE("============= %d===============\n",m_cur_security);
 			}	
 		}
 #endif	
+
+		/* De-queue the next avaliable buffer */
+		if (ioctl(camera_device, VIDIOC_DQBUF, &mCfilledbuffer) < 0)  
+		{
+			LOGE("Camera ESD shock!!\n");
+			
+			CameraStop();
+			if(camera_device)
+			{
+				close(camera_device);
+				camera_device = NULL;
+				LOGD("Camera Driver unload done!\n");
+			}
+			if(CameraCreate(mCameraIndex) < 0){
+				LOGD("CameraCreate Failed!\n");
+				return ;
+			}
+			if(CameraConfigure() < 0){
+				LOGD("CameraConfigure Failed!\n");
+				return;
+			}
+			if(CameraStart()<0){
+				LOGD("CameraStart Failed!\n");
+				return;
+			}
+			return ;
+		}
+		else
+		{
+			if(nCameraBuffersQueued > 0) {
+            	nCameraBuffersQueued--;
+        	}
+			buffers_queued_to_camera_driver[mCfilledbuffer.index] = 0;
+		}
 
 #if OMAP_SCALE
 		if(mCameraIndex == VGA_CAMERA && mCamMode != VT_MODE && mVideoBuffer_422[mCfilledbuffer.index] != NULL)
@@ -1818,9 +1848,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 			}
 			else
 				yuv_buffer = (uint8_t*) data->ptr;
-		  //LOGE("AKMM: modify overlay address");
-		  //LOGE("AKMM: vpp_buffer is 0x%x yuv_buffer 0x%x    wid %d  ht %d",vpp_buffer,yuv_buffer , mPreviewWidth, mPreviewHeight);
-			if(scale_process(vpp_buffer, mPreviewWidth,mPreviewHeight, yuv_buffer,mPreviewWidth, mPreviewHeight  , 0, PIX_YUV422I, 1))
+			if(scale_process(vpp_buffer, mPreviewWidth,mPreviewHeight, yuv_buffer, mPreviewWidth, mPreviewHeight, 0, PIX_YUV422I, 1))
 			{
 				LOGE("scale_process() failed\n");
 			}
@@ -1829,8 +1857,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 
 		if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
 		{
-
-			vpp_buffer =  (uint8_t*)mCfilledbuffer.m.userptr;
+			vpp_buffer = (uint8_t*)mCfilledbuffer.m.userptr;
 
 			if(mCamMode == VT_MODE)
 			{
@@ -1843,16 +1870,16 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 				{
 					Neon_Convert_yuv422_to_YUV420P((unsigned char *)vpp_buffer,(unsigned char *)mVideoConversionBuffer[mCfilledbuffer.index]->pointer(), mPreviewWidth, mPreviewHeight); 				
 				}
-				mDataCb( CAMERA_MSG_PREVIEW_FRAME,mVideoConversionBuffer[mCfilledbuffer.index] ,mCallbackCookie);	
-				HAL_PRINT("VTMode preview callback done!\n");
+				mDataCb(CAMERA_MSG_PREVIEW_FRAME, mVideoConversionBuffer[mCfilledbuffer.index], mCallbackCookie);	
+				// HAL_PRINT("VTMode preview callback done!\n");
 			}
 			else
 			{
-				if(mPreviewWidth!=HD_WIDTH)
+				if(mPreviewWidth != HD_WIDTH)
 				{        
 					Neon_Convert_yuv422_to_NV21((unsigned char *)vpp_buffer,(unsigned char *)mVideoConversionBuffer[mCfilledbuffer.index]->pointer(), mPreviewWidth, mPreviewHeight);
-					mDataCb( CAMERA_MSG_PREVIEW_FRAME,mVideoConversionBuffer[mCfilledbuffer.index] ,mCallbackCookie);
-					HAL_PRINT("Normal preview callback done!\n");
+					mDataCb(CAMERA_MSG_PREVIEW_FRAME, mVideoConversionBuffer[mCfilledbuffer.index], mCallbackCookie);
+					// HAL_PRINT("Normal preview callback done!\n");
 				}
 			}
 		}
@@ -1879,7 +1906,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 
 #if	CHECK_FRAMERATE
 		debugShowFPS();
-#endif  //#if CHECK_FRAMERATE
+#endif
 
 		if(true == mRecordEnabled && iOutStandingBuffersWithEncoder < 3)//dont send more than 4.
 		{
@@ -1918,7 +1945,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 						}
 #ifdef OMAP_ENHANCEMENT	 		
 						mDataCbTimestamp(mCurrentTime,CAMERA_MSG_VIDEO_FRAME,mVideoBuffer_422[mBufferCount_422],mCallbackCookie,0,0);
-						HAL_PRINT("VTMode MainCam Video callback done!\n");
+						// HAL_PRINT("VTMode MainCam Video callback done!\n");
 #endif
 					}
 					else
@@ -1926,7 +1953,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 						memcpy((void*)mVideoBuffer_422[mBufferCount_422]->pointer(), (void*)mCfilledbuffer.m.userptr, 176*144*2);
 #ifdef OMAP_ENHANCEMENT	 
 						mDataCbTimestamp(mCurrentTime,CAMERA_MSG_VIDEO_FRAME,mVideoBuffer_422[mBufferCount_422],mCallbackCookie,0,0);
-						HAL_PRINT("VTMode VGACam Video callback done!\n");
+						// HAL_PRINT("VTMode VGACam Video callback done!\n");
 #endif
 					}
 				}
@@ -1934,19 +1961,15 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 				{
 #ifdef OMAP_ENHANCEMENT	 
 					mDataCbTimestamp(mCurrentTime,CAMERA_MSG_VIDEO_FRAME,mVideoBuffer[(int)mCfilledbuffer.index],mCallbackCookie,0,0);
-					HAL_PRINT("Normal Video callback done!\n");
+					// HAL_PRINT("Normal Video callback done!\n");
 #endif
 				}
 			}
-
-
 			queueBufferCheck = false;
-
 		}
 		else
 		{
 			queueBufferCheck = true;
-
 			if(true == mRecordEnabled && iOutStandingBuffersWithEncoder == 3) //if opencore has 3 buffers
 			{
 				iConsecutiveVideoFrameDropCount++;
@@ -1956,52 +1979,140 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 				}
 			}
 		}
+		//Queue Buffer to Overlay    
 
-        nsecs_t timestamp;
-        index = dequeueFromCamera(&timestamp);
-        if (-1 == index) {
-            return;
-        }
+		if (!mCounterSkipFrame && mOverlay != NULL)	// Latona TD/Heron : VT_BACKGROUND_SOLUTION
+		{
+			// Normal Flow send the frame for display
+			mCounterSkipFrame = mSkipFrameNumber;   //Reset to Zero
 
-        if(msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME))
-            mDataCb(CAMERA_MSG_PREVIEW_FRAME, mPreviewBuffers[index], mCallbackCookie);
+			// Notify overlay of a new frame.	
+			if(buffers_queued_to_dss[mCfilledbuffer.index] != 1)
+			{
+				int nBuffers_queued_to_dss = mOverlay->queueBuffer((void*)mCfilledbuffer.index);
 
-        mRecordingLock.lock();
-        if (nCameraBuffersQueued == 0) {
-            LOGV("Drop the frame. Camera is starving");
-            queueToCamera(index);
-            goto queue_and_exit;
-        }
+				if (nBuffers_queued_to_dss < 0)
+				{
+					LOGE("nextPreview(): mOverlay->queueBuffer(%d) failed", mCfilledbuffer.index);
+				}
+				else
+				{
+					nOverlayBuffersQueued++;
+					buffers_queued_to_dss[mCfilledbuffer.index] = 1; //queued
+					if (nBuffers_queued_to_dss != nOverlayBuffersQueued)
+					{
+						LOGE("Before reset nBuffers_queued_to_dss = %d, nOverlayBuffersQueued = %d", nBuffers_queued_to_dss, nOverlayBuffersQueued);
+						LOGE("Before reset buffers in DSS \n %d %d %d  %d %d %d", 
+								buffers_queued_to_dss[0], 
+								buffers_queued_to_dss[1],
+								buffers_queued_to_dss[2], 
+								buffers_queued_to_dss[3], 
+								buffers_queued_to_dss[4], 
+								buffers_queued_to_dss[5]);
+						
+						int index = mCfilledbuffer.index; //NCB-TI Fix for error case queue buff fail
+						for(int k = 0; k < MAX_CAMERA_BUFFERS; k++)
+						{
+							if ((buffers_queued_to_dss[k] == 1) && (k != index))
+							{
+								buffers_queued_to_dss[k] = 0;
+								nOverlayBuffersQueued--;
+							}
+						}
+						LOGE("After reset nBuffers_queued_to_dss = %d, nOverlayBuffersQueued = %d", nBuffers_queued_to_dss, nOverlayBuffersQueued);
+						LOGE("After reset buffers in DSS \n %d %d %d  %d %d %d", 
+								buffers_queued_to_dss[0], 
+								buffers_queued_to_dss[1],
+								buffers_queued_to_dss[2], 
+								buffers_queued_to_dss[3], 
+								buffers_queued_to_dss[4], 
+								buffers_queued_to_dss[5]);
+					}
+				}
+			}
+			else
+			{
+				LOGE("NCB_DBG:Buffer already with Overlay %d",mCfilledbuffer.index);
+			}	
+			if (nOverlayBuffersQueued >= NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE)
+			{
+				if(mOverlay->dequeueBuffer(&overlaybuffer) < 0)
+				{
+					// OVL_PATCH		NCB-TI E					
+					// This patch is taken from the Halo CameraHal to handle the cases : Dequeue fail for stream OFF	
+					// Overlay went from stream on to stream off
+					// We need to reclaim all of these buffers since the video queue will be lost
+					if(mDSSActive)
+					{
+						LOGD("Overlay went from STREAM ON to STREAM OFF");
+						unsigned int nDSS_ct = 0;
+						int buffer_count =  mOverlay->getBufferCount();
+						for(int i =0; i < buffer_count ; i++)
+						{
+							LOGD("NCB_DBG:Buf Ct %d, DSS[%d] = %d, Ovl Ct %d",buffer_count,i,buffers_queued_to_dss[i],nOverlayBuffersQueued);
+							if(buffers_queued_to_dss[i] == 1)
+							{
+								// we need to find out if this buffer was queued after overlay called stream off
+								// if so, then we should not reclaim it
 
-        if(mRecordEnabled) {
-            buffers_queued_to_dss[index] |= BUFF_Q2VE;
+								if((data = (mapping_data_t*) mOverlay->getBufferAddress((void*)i)) != NULL)
+								{
+									if(!data->nQueueToOverlay)
+									{
+										nOverlayBuffersQueued--;
+										buffers_queued_to_dss[i] = 0;
+										nDSS_ct++;
+									}
+									else
+									{
+										LOGE("Trying to Reclaim[%d] to CameraHAL but is already queued to overlay", i);
+									}
+								}
+								else
+								{
+									LOGE("Error getBufferAddress couldn't return any pointer.");
+								}
+							}
+						}
 
-            // unlock mRecordingLock before sending frame to CameraService to avoid
-            // deadlock when in the same time releaseRecordingFrame is invoked.
-            mRecordingLock.unlock();
-            //mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME, mVideoBuffer[index], mCallbackCookie, 0, 0);
-            mRecordingLock.lock();
-        }
-        LOGD("HERE WE GO!!");
-        queueToOverlay(index);
+						LOGD("Done reclaiming buffers, there are [%d] buffers queued to overlay actually %d", nOverlayBuffersQueued, nDSS_ct);
+						mDSSActive = false;
+					}
+					else
+					{
+						LOGE("nextPreview(): mOverlay->dequeueBuffer() failed Ct %d\n",nOverlayBuffersQueued);									
+					}
+					//OVL_PATCH     NCB-TI X
+				}
+				else	
+				{
+					if(nOverlayBuffersQueued > 0) 
+                    	nOverlayBuffersQueued--;
+					buffers_queued_to_dss[(int)overlaybuffer] = 0;
+					lastOverlayBufferDQ = (int)overlaybuffer;
+					mDSSActive = true;	//OVL_PATCH
+				}
+			}
+		}        
+		else
+		{
+			// skip the frame for display
+			if(mCounterSkipFrame > 0)
+				mCounterSkipFrame--;
+		}
 
-queue_and_exit:
-        index = dequeueFromOverlay();
-        if(-1 == index) {
-            goto exit;
-        }
-
-        if (buffers_queued_to_dss[index] == BUFF_IDLE)
-            queueToCamera(index);
-
-exit:
-        mRecordingLock.unlock();
-
-        if (UNLIKELY(mDebugFps)) {
-            debugShowFPS();
-        }
-
-        return;
+		if(queueBufferCheck)
+		{
+			if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[mCfilledbuffer.index]) < 0) 
+			{
+				LOGE("nextPreview. VIDIOC_QBUF Failed.");
+			}
+			else
+			{
+	      		buffers_queued_to_camera_driver[mCfilledbuffer.index] = 1;   // Added for CSR - OMAPS00242402
+				nCameraBuffersQueued++;
+			}
+		}
 	}
 
 

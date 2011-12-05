@@ -24,35 +24,24 @@
 *  Use of this software is controlled by the terms and conditions found
 *  in the license agreement under which this software has been supplied.
 * ============================================================================ */
-/*
-TODO:
-
-Memcpy into bm upon receiving fillbufferdone
-
-Replace Allocate Buffer with UseBuffer(using bm) for output buffer.
-
-Better Error handling
-*/
 
 #include <stdio.h>
 #include <string.h>
 #include <semaphore.h>
-#include "../../omx/image/src/openmax_il/jpeg_enc/inc/OMX_JpegEnc_CustomCmd.h"
 
 #include <utils/Log.h>
-//#include <OMX_JpegEnc_CustomCmd.h>
 
 extern "C" {
     #include "OMX_Component.h"
     #include "OMX_IVCommon.h"
 }
 
-class JpegEncoder
+class JpegDecoder
 {
 
 public:
 
-    enum JPEGENC_State
+    enum JPEGDEC_State
     {
         STATE_LOADED,                                   // 0
         STATE_IDLE,                                         // 1
@@ -63,7 +52,7 @@ public:
         STATE_EXIT                                             // 6
     };
 
-    typedef struct JpegEncoderParams
+    typedef struct JpegDecoderParams
     {
         //nWidth;
         //nHeight;
@@ -78,47 +67,21 @@ public:
         //CustomHuffmanTable
         //nCropWidth
         //nCropHeight
-    }JpegEncoderParams;
-        //[ 20100110 Ratnesh 
-	typedef struct IMAGE_INFO {
-        int nWidth;
-        int nHeight ;
-        int nFormat;
-        int nComment;
-        char* pCommentString;
-        int nThumbnailWidth_app0;
-        int nThumbnailHeight_app0;
-        int nThumbnailWidth_app1;
-        int nThumbnailHeight_app1;
-        int nThumbnailWidth_app5;
-        int nThumbnailHeight_app5;
-        int nThumbnailWidth_app13;
-        int nThumbnailHeight_app13;
-        int nDRI;
-        OMX_BOOL bAPP0;
-        OMX_BOOL bAPP1;
-        OMX_BOOL bAPP5;
-        OMX_BOOL bAPP13;
-    } IMAGE_INFO;
-    //]
+    }JpegDecoderParams;
 
-    int jpegSize;
+    int yuvsize;
     sem_t *semaphore;
-    JPEGENC_State iState;
-    JPEGENC_State iLastState;
+    JPEGDEC_State iState;
+    JPEGDEC_State iLastState;
 
-    ~JpegEncoder();
-    JpegEncoder();
-    bool encodeImage(void* outputBuffer, int outBuffSize, void *inputBuffer, int inBuffSize, int width, int height, int quality, int mIsPixelFmt420p);    
-	//[20100110 Ratnesh Modified to take EXIF Info
-    bool encodeImage(void* outputBuffer, int outBuffSize, void *inputBuffer, int inBuffSize, unsigned char* pExifBuf, int ExifSize,int width, int height, int ThumbWidth, int ThumbHeight, int quality, int mIsPixelFmt420p);    
-	//]
-    bool SetJpegEncodeParameters(JpegEncoderParams * jep) {memcpy(&jpegEncParams, jep, sizeof(JpegEncoderParams)); return true;}
+    ~JpegDecoder();
+    JpegDecoder();
+    bool decodeImage(void* outputBuffer, int outBuffSize, void *inputBuffer, int inBuffSize, int width, int height, int quality, int mIsPixelFmt420p);    
+    bool SetJpegDecodeParameters(JpegDecoderParams * jep) {memcpy(&jpegDecParams, jep, sizeof(JpegDecoderParams)); return true;}
     void Run();
     void PrintState();
     void FillBufferDone(OMX_U8* pBuffer, OMX_U32 size);
     bool StartFromLoadedState();
-    bool StartFromLoadedState(unsigned char* pExifBuf, int ExifSize, int ThumbWidth, int ThumbHeight); //[ 20100110 Ratnesh Modified for EXIF
     void EventHandler(OMX_HANDLETYPE hComponent,
                                             OMX_EVENTTYPE eEvent,
                                             OMX_U32 nData1,
@@ -132,7 +95,7 @@ private:
     OMX_BUFFERHEADERTYPE *pOutBuffHead;
     OMX_PARAM_PORTDEFINITIONTYPE InPortDef;
     OMX_PARAM_PORTDEFINITIONTYPE OutPortDef;
-    JpegEncoderParams jpegEncParams;
+    JpegDecoderParams jpegDecParams;
     void* mOutputBuffer;
     int mOutBuffSize;
     void *mInputBuffer;
@@ -140,15 +103,15 @@ private:
     int mWidth;
     int mHeight;
     int mQuality;
-	int mIsPixelFmt420p;
+    int mIsPixelFmt420p;
 };
 
-OMX_ERRORTYPE OMX_JPEGE_FillBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR ptr, OMX_BUFFERHEADERTYPE* pBuffHead);
-OMX_ERRORTYPE OMX_JPEGE_EmptyBufferDone(OMX_HANDLETYPE hComponent, OMX_PTR ptr, OMX_BUFFERHEADERTYPE* pBuffer);
-OMX_ERRORTYPE OMX_JPEGE_EventHandler(OMX_HANDLETYPE hComponent,
-                                            OMX_PTR pAppData,
-                                            OMX_EVENTTYPE eEvent,
-                                            OMX_U32 nData1,
-                                            OMX_U32 nData2,
-                                            OMX_PTR pEventData);
+OMX_ERRORTYPE JPEGE_FillBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR ptr, OMX_BUFFERHEADERTYPE* pBuffHead);
+OMX_ERRORTYPE JPEGE_EmptyBufferDone(OMX_HANDLETYPE hComponent, OMX_PTR ptr, OMX_BUFFERHEADERTYPE* pBuffer);
+OMX_ERRORTYPE JPEGE_EventHandler(OMX_HANDLETYPE hComponent,
+                                            								OMX_PTR pAppData,
+                                            									OMX_EVENTTYPE eEvent,
+                                            										OMX_U32 nData1,
+                                            											OMX_U32 nData2,
+                                            												OMX_PTR pEventData);
 

@@ -22,8 +22,16 @@ MessageQueue::MessageQueue()
 
 MessageQueue::~MessageQueue()
 {
-    close(this->fd_read);
-    close(this->fd_write);
+    int err = 0;
+    err = close(this->fd_read);
+    if(err != 0){
+        LOGE ("Error:fds failed to close 0\n");
+    }
+
+    err = close(this->fd_write);
+    if(err != 0){
+        LOGE ("Error:fds[1] failed to close 0\n");
+    }
 }
 
 int MessageQueue::get(Message* msg)
@@ -34,7 +42,7 @@ int MessageQueue::get(Message* msg)
     while( read_bytes  < sizeof(msg) )
     {
         int err = read(this->fd_read, p, sizeof(*msg) - read_bytes);
-
+        
         if( err < 0 ) {
             LOGE("read() error: %s", strerror(errno));
             return -1;
@@ -43,18 +51,9 @@ int MessageQueue::get(Message* msg)
             read_bytes += err;
     }
 
-#ifdef DEBUG_LOG
-
-    LOGD("MQ.get(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
-
-#endif
+    LOGD("MQ.get(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);    
 
     return 0;
-}
-
-int MessageQueue::getInFd()
-{
-    return this->fd_read;
 }
 
 int MessageQueue::put(Message* msg)
@@ -62,16 +61,12 @@ int MessageQueue::put(Message* msg)
     char* p = (char*) msg;
     size_t bytes = 0;
 
-#ifdef DEBUG_LOG
-
     LOGD("MQ.put(%d,%p,%p,%p,%p)", msg->command, msg->arg1,msg->arg2,msg->arg3,msg->arg4);
-
-#endif
 
     while( bytes  < sizeof(msg) )
     {
         int err = write(this->fd_write, p, sizeof(*msg) - bytes);
-
+    	 
         if( err < 0 ) {
             LOGE("write() error: %s", strerror(errno));
             return -1;
@@ -80,13 +75,9 @@ int MessageQueue::put(Message* msg)
             bytes += err;
     }
 
-#ifdef DEBUG_LOG
-
     LOGD("MessageQueue::put EXIT");
 
-#endif
-
-    return 0;
+    return 0;    
 }
 
 

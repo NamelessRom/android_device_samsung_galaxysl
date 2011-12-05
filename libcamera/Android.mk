@@ -1,6 +1,3 @@
-ifeq ($(TARGET_BOARD_PLATFORM),omap3)
-
-################################################
 
 LOCAL_PATH:= $(call my-dir)
 
@@ -10,6 +7,7 @@ LOCAL_SRC_FILES:= \
     CameraHal.cpp \
     CameraHal_Utils.cpp \
     MessageQueue.cpp \
+    ExifCreator.cpp\
     
 LOCAL_SHARED_LIBRARIES:= \
     libdl \
@@ -23,7 +21,9 @@ LOCAL_SHARED_LIBRARIES:= \
 LOCAL_C_INCLUDES += \
     frameworks/base/include/camera \
     frameworks/base/include/binder \
-    hardware/ti/omap3/liboverlay
+    frameworks/base/include/ui \
+    hardware/ti/omap3/liboverlay \
+    device/samsung/galaxysl/liboverlay
 
 LOCAL_CFLAGS += -fno-short-enums 
 
@@ -32,88 +32,91 @@ ifdef HARDWARE_OMX
 LOCAL_SRC_FILES += \
     scale.c \
     JpegEncoder.cpp \
-    JpegEncoderEXIF.cpp \
+    JpegDecoder.cpp
 
 LOCAL_C_INCLUDES += \
     hardware/ti/omap3/dspbridge/api/inc \
     hardware/ti/omx/system/src/openmax_il/lcml/inc \
     hardware/ti/omx/system/src/openmax_il/omx_core/inc \
     hardware/ti/omx/system/src/openmax_il/common/inc \
-    hardware/ti/omx/image/src/openmax_il/jpeg_enc/inc \
-    external/libexif
+    hardware/ti/omx/video/src/openmax_il/prepost_processor/inc \
+    hardware/ti/omx/system/src/openmax_il/resource_manager_proxy/inc \
+    hardware/ti/omx/system/src/openmax_il/resource_manager/resource_activity_monitor/inc
 
 LOCAL_CFLAGS += -O0 -g3 -fpic -fstrict-aliasing -DIPP_LINUX -D___ANDROID___ -DHARDWARE_OMX
 
 LOCAL_SHARED_LIBRARIES += \
     libbridge \
     libLCML \
-    libOMX_Core
-
-LOCAL_STATIC_LIBRARIES := \
-        libexifgnu
+    libOMX_Core 
 
 endif
 
-
+ifdef OMAP_ENHANCEMENT	
 ifdef FW3A
 
 LOCAL_C_INCLUDES += \
-    hardware/ti/omap3/fw3A/include/ \
-        hardware/ti/omap3/fw3A/include/fw/api/linux/
+    hardware/ti/omap3/mm_isp/ipp/inc \
+    hardware/ti/omap3/mm_isp/capl/inc \
+    hardware/ti/omap3/fw3A/include \
+    hardware/ti/omap3/arcsoft \
+    hardware/ti/omap3/arcsoft/include \
+    hardware/ti/omap3/arcsoft/arc_redeye/include \
+    hardware/ti/omap3/arcsoft/arc_facetracking/include \
+    hardware/ti/omap3/arcsoft/arc_antishaking/include \
+    hardware/ti/omap3/mms_ipp_new/ARM11/inc
 
 LOCAL_SHARED_LIBRARIES += \
     libdl \
-    libicamera \
-    libicapture \
-
-LOCAL_CFLAGS += -O0 -g3 -DIPP_LINUX -D___ANDROID___ -DFW3A -DICAP
-
-endif
-
-ifdef IMAGE_PROCESSING_PIPELINE
-
-LOCAL_C_INCLUDES += \
-        hardware/ti/omap3/mm_isp/ipp/inc \
-        hardware/ti/omap3/mm_isp/capl/inc \
-
-LOCAL_SHARED_LIBRARIES += \
     libcapl \
     libImagePipeline
 
-LOCAL_CFLAGS += -DIMAGE_PROCESSING_PIPELINE
+LOCAL_CFLAGS += -O0 -g3 -DIPP_LINUX -D___ANDROID___ -DFW3A -DICAP -DIMAGE_PROCESSING_PIPELINE
 
 endif
-
-LOCAL_CFLAGS += -DSECONDARY_CAMERA
+endif
 
 LOCAL_MODULE:= libcamera
+LOCAL_MODULE_TAGS:= optional
 
-LOCAL_MODULE_TAGS := optional
+LOCAL_WHOLE_STATIC_LIBRARIES:= libyuv
 
 include $(BUILD_SHARED_LIBRARY)
+include $(LOCAL_PATH)/Neon/android.mk
 
 ################################################
 
-ifdef HARDWARE_OMX
+#ifdef HARDWARE_OMX
 
-include $(CLEAR_VARS)
+#include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := JpegEncoderTest.cpp
+#LOCAL_SRC_FILES := JpegEncoderTest.cpp
 
-LOCAL_C_INCLUDES := hardware/ti/omx/system/src/openmax_il/omx_core/inc\
-                    hardware/ti/omx/image/src/openmax_il/jpeg_enc/inc \
-                    external/libexif \
+#LOCAL_C_INCLUDES := hardware/ti/omx/system/src/openmax_il/omx_core/inc
 
-LOCAL_SHARED_LIBRARIES := libcamera
+#LOCAL_SHARED_LIBRARIES := libcamera
 
-LOCAL_MODULE := JpegEncoderTest
+#LOCAL_MODULE := JpegEncoderTest
+#LOCAL_MODULE_TAGS:= optional
 
-LOCAL_MODULE_TAGS := optional
+#include $(BUILD_EXECUTABLE)
 
-include $(BUILD_EXECUTABLE)
-
-endif
+#endif
 
 ################################################
 
-endif
+#include $(CLEAR_VARS)
+
+#LOCAL_SRC_FILES := CameraHalTest.cpp
+
+#LOCAL_C_INCLUDES := device/samsung/galaxysl/liboverlay \
+#                    hardware/ti/omap3/liboverlay
+
+#LOCAL_SHARED_LIBRARIES := libcamera
+
+#LOCAL_MODULE := CameraHalTest
+#LOCAL_MODULE_TAGS:= optional
+
+#include $(BUILD_EXECUTABLE)
+
+################################################
