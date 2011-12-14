@@ -28,14 +28,10 @@
 
 #include "CameraHal.h"
 #include <cutils/properties.h>
-#define UNLIKELY( exp ) (__builtin_expect( (exp) != 0, false ))
-static int mDebugFps = 0;
 
-//CAM_MEM
 #define USE_MEMCOPY_FOR_VIDEO_FRAME 0
 #define USE_NEW_OVERLAY 			1
-//CAM_MEM
-//Eclair L25.14
+
 #define HD_WIDTH       1280
 #define HD_HEIGHT      720
 #define WIDE_WIDTH     1280
@@ -78,10 +74,8 @@ namespace android {
 		int num_buffers;
 		int shared_size;
 		int device_id;    /* Video pipe 1 and video pipe 2 */
-
 	};
 
-	//CAM_MEM
 	/* Defined in liboverlay */
 	typedef struct {
 		int fd;
@@ -197,13 +191,13 @@ namespace android {
 		"auto",				//CAMERA_ANTIBANDING_AUTO,
 		"max"				//CAMERA_MAX_ANTIBANDING,
 	};
+
 #define MAX_ANTI_BANDING_VALUES 5
-#define MAX_ZOOM_STEPS 23
-#define MAX_ZOOM 30
+#define MAX_ZOOM_STEPS 		23
+#define MAX_ZOOM 			30
 
 #define CLEAR(x) memset (&(x), 0, sizeof (x))
 
-	/* M4MO Auto Focus Mode */
 #define AF_START			1
 #define AF_STOP				2
 #define CAF_START			5
@@ -224,6 +218,13 @@ namespace android {
 #define ISO_400         	5
 #define ISO_800         	6
 
+#define YUV_SUPERFINE   	100
+#define YUV_FINE        	75
+#define YUV_ECONOMY     	50
+#define YUV_NORMAL      	25
+
+#define DISPLAYFPS 			15
+
 #define JPEG_SUPERFINE        1
 #define JPEG_FINE             2
 #define JPEG_NORMAL           3
@@ -232,12 +233,6 @@ namespace android {
 #define JPEG_FINE_limit       50
 #define JPEG_NORMAL_limit     25
 
-#define YUV_SUPERFINE   	100
-#define YUV_FINE        	75
-#define YUV_ECONOMY     	50
-#define YUV_NORMAL      	25
-
-#define DISPLAYFPS 			15
 
 	int CameraHal::camera_device = NULL;
 	wp<CameraHardwareInterface> CameraHal::singleton;
@@ -266,9 +261,7 @@ namespace android {
 		mflash(2),
 		mcapture_mode(1),
 		mcaf(0),
-		j(0),
 		myuv(3),
-		mMMSApp(0),
 		mCurrentTime(0),
 		mCaptureFlag(0),
 		mCamera_Mode(CAMERA_MODE_JPEG),
@@ -282,10 +275,7 @@ namespace android {
 		mCounterSkipFrame(0),
 		mSkipFrameNumber(0),
 		mPassedFirstFrame(0),
-		// OVL_PATCH [[
-		mDSSActive (false),                   //OVL_PATCH
-		dequeue_from_dss_failed(0),
-		// OVL_PATCH ]]
+		mDSSActive (false),		//OVL_PATCH
 		mOldResetCount(0),
 		mBufferCount_422(0),
 		m_chk_dataline(0),
@@ -305,8 +295,8 @@ namespace android {
 
 		isStart_JPEG = false;
 		isStart_Scale = false;
-		mFalsePreview = false;  //Android HAL
-		mRecorded = false;  	//Android HAL
+		mFalsePreview = false; 
+		mRecorded = false;  	
 		mAutoFocusRunning = false;   
 		iOutStandingBuffersWithEncoder = 0;
 #ifdef OMAP_ENHANCEMENT	  
@@ -345,7 +335,7 @@ namespace android {
 #ifdef VT_BACKGROUND_SOLUTION
 			mVTHeaps[i] = 0;
 			mVTBuffer[i] = 0;
-#endif //VT_BACKGROUND_SOLUTION
+#endif
 		}
 
 		if(CameraCreate(cameraId) < 0) {
@@ -368,6 +358,7 @@ namespace android {
 	CameraHal::~CameraHal()
 	{
 		int err = 0;
+
 		LOG_FUNCTION_NAME
 
 		if(mPreviewThread != NULL) 
@@ -380,7 +371,7 @@ namespace android {
 
 		sp<PreviewThread> previewThread;
 
-		{ // scope for the lock
+		{	// scope for the lock
 			Mutex::Autolock lock(mLock);
 			previewThread = mPreviewThread;
 		}
@@ -403,7 +394,6 @@ namespace android {
 #endif
 
 #ifdef EVE_CAM
-
 		if(mVideoHeaps_422 != 0)
 		{
 			mVideoHeaps_422.clear();
@@ -435,25 +425,23 @@ namespace android {
 		}
 #endif //VT_BACKGROUND_SOLUTION
 
-		mRecordEnabled = false; // Eclair HAL
-		mFalsePreview =false;   // Eclair HAL
-		mRecorded = false;      // Eclair HAL
-		mCallbackCookie = NULL; // Eclair HAL
+		mRecordEnabled = false; 
+		mFalsePreview =false;   
+		mRecorded = false;      
+		mCallbackCookie = NULL; 
 
 		mCurrentTime = 0;
 		ICaptureDestroy();
 
 		CameraDestroy();
 
-		if ( mOverlay != NULL && mOverlay.get() != NULL )		// Latona TD/Heron : VT_BACKGROUND_SOLUTION 
+		if (mOverlay != NULL && mOverlay.get() != NULL)		// Latona TD/Heron : VT_BACKGROUND_SOLUTION 
 		{
 			HAL_PRINT("Destroying current overlay\n");
 			mOverlay->destroy();
 			mOverlay = NULL;
 			nOverlayBuffersQueued = 0;
-			// OVL_PATCH [[
 			mDSSActive = false;                  //OVL_PATCH
-			// OVL_PATCH ]]
 		}
 		if(pTIrtn != NULL)
 		{
@@ -464,7 +452,7 @@ namespace android {
 
 		singleton.clear();
 
-		HAL_PRINT("<<< Release >>>\n");
+		LOGD("<<< Release >>>\n");
 	} //end of CameraHal destructor
 
 	void CameraHal::initDefaultParameters(int cameraId)
@@ -614,8 +602,8 @@ namespace android {
 	void CameraHal::previewThread(int cameraId)
 	{
 		Message msg;
-		bool  shouldLive = true;
-		bool has_message;
+		bool shouldLive = true;
+		bool has_message = false;
 		int err; 
 		int frameCount = 0 ;
 
@@ -649,7 +637,7 @@ namespace android {
 
 				}
 				//process 1 preview frame
-				if(mOverlay != NULL)
+				if(mCamMode == VT_MODE || mOverlay != NULL)					
 					nextPreview();
 
 				if( !previewThreadCommandQ.isEmpty() ) 
@@ -677,48 +665,53 @@ namespace android {
 						HAL_PRINT("Receive Command: PREVIEW_START\n");              
 						err = 0;
 
-						mFalsePreview = false;   //Eclair HAL
 
 						if( !mPreviewRunning ) 
 						{
 #if TIMECHECK
 							PPM("CONFIGURING CAMERA TO RESTART PREVIEW\n");
 #endif
-							if (CameraConfigure() < 0)
-							{
-								LOGE("ERROR CameraConfigure()\n");                    
-								if(mCamMode == Trd_PART)
+							if (mOverlay == NULL && !getVTMode()) {
+								mFalsePreview = true;
+								msg.command = PREVIEW_ACK;
+							}else{				
+								mFalsePreview = false;
+								if (CameraConfigure() < 0)
 								{
-									CameraDestroy();
-									msg.command = PREVIEW_NACK;
+									LOGE("ERROR CameraConfigure()\n");                    
+									if(mCamMode == Trd_PART)
+									{
+										CameraDestroy();
+										msg.command = PREVIEW_NACK;
+									}
+									else
+									{
+										mNotifyCb(CAMERA_MSG_ERROR,CAMERA_DEVICE_ERROR_FOR_EXIT,0,mCallbackCookie);
+										msg.command = PREVIEW_ACK;
+									} 
+									previewThreadAckQ.put(&msg);
+									err = -1;
+									break;
 								}
-								else
-								{
-									mNotifyCb(CAMERA_MSG_ERROR,CAMERA_DEVICE_ERROR_FOR_EXIT,0,mCallbackCookie);
-									msg.command = PREVIEW_ACK;
-								} 
-								previewThreadAckQ.put(&msg);
-								err = -1;
-								break;
-							}
 
-							if (CameraStart() < 0)
-							{
-								LOGE("ERROR CameraStart()\n");                    
-								if(mCamMode == Trd_PART)
+								if (CameraStart() < 0)
 								{
-									CameraDestroy();
-									msg.command = PREVIEW_NACK;
-								}
-								else
-								{
-									mNotifyCb(CAMERA_MSG_ERROR,CAMERA_DEVICE_ERROR_FOR_EXIT,0,mCallbackCookie);
-									msg.command = PREVIEW_ACK;
-								} 
-								previewThreadAckQ.put(&msg);
-								err = -1;
-								break;
-							}      
+									LOGE("ERROR CameraStart()\n");                    
+									if(mCamMode == Trd_PART)
+									{
+										CameraDestroy();
+										msg.command = PREVIEW_NACK;
+									}
+									else
+									{
+										mNotifyCb(CAMERA_MSG_ERROR,CAMERA_DEVICE_ERROR_FOR_EXIT,0,mCallbackCookie);
+										msg.command = PREVIEW_ACK;
+									} 
+									previewThreadAckQ.put(&msg);
+									err = -1;
+									break;
+								}   
+							}
 #if TIMECHECK
 							PPM("PREVIEW STARTED AFTER CAPTURING\n");
 #endif
@@ -772,7 +765,7 @@ namespace android {
 							{
 								msg.command = PREVIEW_ACK;
 							}
-							mFalsePreview = false;  //Eclair HAL  
+							mFalsePreview = false;
 						}
 						else
 						{
@@ -784,80 +777,6 @@ namespace android {
 						previewThreadAckQ.put(&msg);
 					}
 					break;
-					
-#if 0 // It was changed to thread.
-				case PREVIEW_AF_START:
-					{
-						HAL_PRINT("Receive Command: PREVIEW_AF_START\n");
-						err = 0;
-
-						if( camera_device < 0 || !mPreviewRunning )
-						{
-							LOGD("WARNING PREVIEW NOT RUNNING!\n");
-							msg.command = PREVIEW_NACK;
-						}
-						else
-						{
-							vc.id = V4L2_CID_AF;
-							vc.value = AF_STOP;
-
-							if (ioctl (camera_device, VIDIOC_S_CTRL, &vc) < 0)
-								LOGE("release autofocus fail\n");
-
-							if(mMsgEnabled & CAMERA_MSG_FOCUS)
-							{
-								//[ 20091111 myungwoo ko
-								vc.id = V4L2_CID_AF;
-								vc.value = AF_START;
-								if (ioctl (camera_device, VIDIOC_S_CTRL, &vc) < 0)
-								{   
-									LOGE("setautofocus fail\n");
-									mNotifyCb(CAMERA_MSG_FOCUS,CAMERA_AF_FAIL,0,mCallbackCookie);
-									mAFState = false;                                                   
-								}
-								else
-								{
-									mAFState = true;
-								}
-								//]
-								msg.command = err ? PREVIEW_NACK : PREVIEW_ACK;   
-							}
-
-						}
-						HAL_PRINT("Receive Command: PREVIEW_AF_START %s\n", msg.command == PREVIEW_NACK ? "NACK" : "ACK"); 
-						previewThreadAckQ.put(&msg);
-					}
-					break;
-
-				case PREVIEW_AF_CANCEL:
-					{
-						HAL_PRINT("Receive Command: PREVIEW_AF_CANCEL\n");
-
-						msg.command = PREVIEW_ACK;
-
-						if( camera_device < 0 || !mPreviewRunning )
-						{
-							LOGD("WARNING PREVIEW NOT RUNNING!\n");
-						}
-						else
-						{
-							vc.id = V4L2_CID_AF;
-							vc.value = AF_STOP;
-
-							if (ioctl (camera_device, VIDIOC_S_CTRL, &vc) < 0)
-							{   
-								LOGE("release autofocus fail\n");
-							}
-							else
-							{
-							//	mNotifyCb(CAMERA_MSG_FOCUS,CAMERA_AF_CANCEL,0,mCallbackCookie);
-							}
-							mAFState = false; 
-						}
-						previewThreadAckQ.put(&msg);
-					}
-					break;
-#endif
 
 				case PREVIEW_CAF_START:
 					{
@@ -901,7 +820,7 @@ namespace android {
 						int flg_CAF;
 						err = 0;
 
-						HAL_PRINT("ENTER OPTION PREVIEW_CAPTURE\n");
+						HAL_PRINT("Receive Command: PREVIEW_CAPTURE\n");
 #if TIMECHECK
 						PPM("RECEIVED COMMAND TO TAKE A PICTURE\n");
 #endif
@@ -913,7 +832,6 @@ namespace android {
 							err = -1;
 						}
 						else 
-
 						{
 #ifdef OPP_OPTIMIZATION
 							if ( RMProxy_RequestBoost(MAX_BOOST) != OMX_ErrorNone ) 
@@ -951,7 +869,6 @@ namespace android {
 							PPM("STOPPED PREVIEW\n");
 #endif
 							if(mCamMode == Trd_PART) {
-
 								if(createThread(beginPictureThread, this) == false) {
 									LOGE("ERROR CapturePicture()\n");    
 									CameraDestroy();
@@ -961,7 +878,6 @@ namespace android {
 								}
 
 							} else {
-
 								if (createThread(beginPictureThread, this) == false) {
 									msg.command = CAPTURE_NACK;
 									previewThreadAckQ.put(&msg);  
@@ -1010,7 +926,7 @@ namespace android {
 							}
 							HAL_PRINT("After VIDIOC_STREAMOFF\n");
 							
-							CameraSetFrameRate();
+							setCaptureFrameRate();
 
 							type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 							err = ioctl(camera_device, VIDIOC_STREAMON, &type);
@@ -1097,7 +1013,7 @@ namespace android {
 			}
 
 #if OMAP_SCALE 			
-	        if(!isStart_Scale)
+	        if(!isStart_Scale && mCameraIndex == VGA_CAMERA)
 	        {
                 if ( scale_init(PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_WIDTH, PREVIEW_HEIGHT, PIX_YUV422I, PIX_YUV422I) < 0 ) 
                 {
@@ -1142,8 +1058,6 @@ exit:
 				// need to free buffers and heaps mapped using overlay fd before it is destroyed
 				// otherwise we could create a resource leak
 				// a segfault could occur if we try to free pointers after overlay is destroyed
-                mPreviewBuffers[i].clear();
-                mPreviewHeaps[i].clear();
 				mVideoBuffer[i].clear();
 				mVideoHeaps[i].clear();
 				buffers_queued_to_dss[i] = 0;
@@ -1175,10 +1089,7 @@ exit:
 		struct v4l2_format format;
 
 		int w, h;
-		int image_width, image_height; 
-
-		int mVTMode           = getVTMode(); 	// VTmode
-		int samsungCameraMode = mSamsungCamera; // Samsung/3rd Party    
+		int mVTMode = getVTMode(); 	// VTmode  
 
 		LOG_FUNCTION_NAME    
 
@@ -1195,7 +1106,7 @@ exit:
 					}
 					else
 					{
-						if(samsungCameraMode)
+						if(mSamsungCamera)
 						{
 							mCamMode = CAMERA_MODE;
 						}
@@ -1216,7 +1127,7 @@ exit:
 					}
 					else
 					{
-						if(samsungCameraMode)
+						if(mSamsungCamera)
 						{
 							mCamMode = CAMCORDER_MODE;
 						}
@@ -1237,33 +1148,6 @@ exit:
 
 		if(mCameraIndex == VGA_CAMERA)
 			setDatalineCheckStart();
-
-		if(mCameraIndex == MAIN_CAMERA && mCamMode == VT_MODE)
-		{
-			mParameters.getPreviewSize(&h, &w);
-		}
-		else
-		{
-			mParameters.getPreviewSize(&w, &h);
-		}
-
-		/* Set preview format */
-		format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		format.fmt.pix.width = w;
-		format.fmt.pix.height = h;
-		format.fmt.pix.pixelformat = PIXEL_FORMAT;
-
-		if (initCameraSetFrameRate())
-		{
-			LOGE("Error in setting Camera frame rate\n");
-			return -1;
-		}
-
-		if ( ioctl(camera_device, VIDIOC_S_FMT, &format) < 0 )
-		{
-			LOGE ("Failed to set VIDIOC_S_FMT.\n");
-			return -1;
-		}
 
 		setWB(getWBLighting());
 		setEffect(getEffect());
@@ -1295,6 +1179,33 @@ exit:
 			setPrettyMode(getPrettyValue());		
 		}	
 
+		if(mCameraIndex == MAIN_CAMERA && mCamMode == VT_MODE)
+		{
+			mParameters.getPreviewSize(&h, &w);
+		}
+		else
+		{
+			mParameters.getPreviewSize(&w, &h);
+		}
+
+		/* Set preview format */
+		format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		format.fmt.pix.width = w;
+		format.fmt.pix.height = h;
+		format.fmt.pix.pixelformat = PIXEL_FORMAT;
+
+		if (setPreviewFrameRate())
+		{
+			LOGE("Error in setting Camera frame rate\n");
+			return -1;
+		}
+
+		if ( ioctl(camera_device, VIDIOC_S_FMT, &format) < 0 )
+		{
+			LOGE ("Failed to set VIDIOC_S_FMT.\n");
+			return -1;
+		}
+
 		HAL_PRINT("CameraConfigure PreviewFormat: w=%d h=%d\n", format.fmt.pix.width, format.fmt.pix.height);	
 
 		LOG_FUNCTION_NAME_EXIT
@@ -1304,11 +1215,8 @@ exit:
 
 	int CameraHal::CameraStart()
 	{
-		int w, h;
-		int err;
-//		int nSizeBytes;
-		int buffer_count;			// VT_BACKGROUND_SOLUTION
-        int line = 0;
+		int w, h, err;
+		int buffer_count;			
 		int mPreviewFrameSizeConvert = 0;  
 
 		struct v4l2_format format;
@@ -1318,8 +1226,8 @@ exit:
 		LOG_FUNCTION_NAME;
 
 		nCameraBuffersQueued = 0;  
-		nOverlayBuffersQueued = 0;  //VIK_DBG_CHK 
-		mCounterSkipFrame = 0 ;
+		nOverlayBuffersQueued = 0; 
+		mCounterSkipFrame = 0;
 		mPassedFirstFrame = false;
 
 		if(mCameraIndex != VGA_CAMERA)
@@ -1344,26 +1252,19 @@ exit:
 			buffer_count = mOverlay->getBufferCount();
 			if(buffer_count > VIDEO_FRAME_COUNT_MAX)
 				buffer_count = VIDEO_FRAME_COUNT_MAX;
-#endif //VT_BACKGROUND_SOLUTION
+#endif
 		}
 		else
 		{
 			LOGD("WARNING, mOverlay is NULL!!\n");
 #ifdef VT_BACKGROUND_SOLUTION
 			buffer_count = VIDEO_FRAME_COUNT_MAX;
-#endif //VT_BACKGROUND_SOLUTION
+#endif
 		}
-
-		mPreviewFrameSize = w * h * 2;
-		if (mPreviewFrameSize & 0xfff)
-		{
-			mPreviewFrameSize = (mPreviewFrameSize & 0xfffff000) + 0x1000;
-		}
-		HAL_PRINT("mPreviewFrameSize = 0x%x = %d", mPreviewFrameSize, mPreviewFrameSize);
 
 #ifndef VT_BACKGROUND_SOLUTION
 		buffer_count = mOverlay->getBufferCount();
-#endif //VT_BACKGROUND_SOLUTION
+#endif
 		nBuffToStartDQ = buffer_count -1;    
 		HAL_PRINT("number of buffers = %d\n", buffer_count);
 
@@ -1375,17 +1276,19 @@ exit:
 			LOGE ("VIDIOC_REQBUFS Failed. %s\n", strerror(errno));
 			goto fail_reqbufs;
 		}
+		
+		mPreviewFrameSize = w * h * 2;
+		if (mPreviewFrameSize & 0xfff)
+		{
+			mPreviewFrameSize = (mPreviewFrameSize & 0xfffff000) + 0x1000;
+		}
+		HAL_PRINT("mPreviewFrameSize = 0x%x = %d", mPreviewFrameSize, mPreviewFrameSize);
 
 #if OMAP_SCALE
 		if(mCameraIndex == VGA_CAMERA && mCamMode != VT_MODE)	//SelfShotMode		
 		{	
 			mVideoHeap_422.clear();
 			mVideoHeap_422 = new MemoryHeapBase(VIDEO_FRAME_COUNT_MAX * mPreviewFrameSize);
-
-			LOGD("mVideoHeap_422: ID:%d,Base:[%p],size:%d", 
-		      	mVideoHeap_422->getHeapID(), 
-		      	mVideoHeap_422->getBase() ,
-			  	mVideoHeap_422->getSize() );	
 		}
 #endif
 
@@ -1403,7 +1306,7 @@ exit:
 #ifdef VT_BACKGROUND_SOLUTION
 			if(mOverlay != NULL)
 			{
-#endif //VT_BACKGROUND_SOLUTION
+#endif 
 				if(mCameraIndex == VGA_CAMERA && mCamMode == VT_MODE)
 				{
 					mOverlay->setParameter(MIRRORING,1); //selwin added
@@ -1413,7 +1316,7 @@ exit:
 				{
 					mOverlay->setParameter(CHECK_CAMERA,1);
 				}
-				//CAM_MEM
+
 				mapping_data_t* data = (mapping_data_t*) mOverlay->getBufferAddress((void*)i);
 				if ( data == NULL ) 
 				{
@@ -1433,31 +1336,42 @@ exit:
 			
 				v4l2_cam_buffer[i].length = data->length;
 
-				// check the V4L2 buffer
+				//Check the V4L2 buffer
 				strcpy((char *)v4l2_cam_buffer[i].m.userptr, "hello");
 				if (strcmp((char *)v4l2_cam_buffer[i].m.userptr, "hello")) 
 				{
 					LOGI("problem with buffer\n");
 					goto fail_loop;
 				}
-				HAL_PRINT("User Buffer [%d].start = %p  length = %d\n", i,
-						(void*)v4l2_cam_buffer[i].m.userptr, v4l2_cam_buffer[i].length);
+				HAL_PRINT("User Buffer [%d].start = %p  length = %d\n", i, (void*)v4l2_cam_buffer[i].m.userptr, v4l2_cam_buffer[i].length);
 
-                // queue to camera
-                if (buffers_queued_to_dss[i] == BUFF_IDLE) {
-                    if (false == queueToCamera(i))
-                        goto fail_loop;
-                } else {
-                    LOGI("CameraStart::Could not queue buffer %d to Camera because it is being held by Overlay", i);
-                }
+				//Reset DSS buffer cheking valiable
+				if(!data->nQueueToOverlay)
+				{
+					LOGD("Overlay buffer[%d] is not used. Stats:%d", i, data->nQueueToOverlay);
+					buffers_queued_to_dss[i] = 0;
+				}
+				else
+				{
+					LOGD("Overlay buffer[%d] is already queued. Stats:%d", i, data->nQueueToOverlay);
+					buffers_queued_to_dss[i] = 1;
+					nOverlayBuffersQueued++;
+				} 
 
-                // ensure we release any stale ref's to sp
-                mPreviewBuffers[i].clear();
-                mPreviewHeaps[i].clear();
-
-                mPreviewHeaps[i] = new MemoryHeapBase(data->fd,mPreviewFrameSize, 0, data->offset);
-                mPreviewBuffers[i] = new MemoryBase(mPreviewHeaps[i], 0, mPreviewFrameSize);
-
+				if (buffers_queued_to_dss[i] == 0)
+				{
+					if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[i]) < 0) {
+						LOGE("CameraStart VIDIOC_QBUF Failed: %s", strerror(errno) );
+						goto fail_loop;
+					}else{
+			      		buffers_queued_to_camera_driver[i] = 1;		// Added for CSR - OMAPS00242402				
+						nCameraBuffersQueued++;
+					}
+				}
+				else 
+				{
+					LOGI("CameraStart::Could not queue buffer %d to Camera because it is being held by Overlay\n", i);
+				}
 #ifdef VT_BACKGROUND_SOLUTION   
 			}
 			else
@@ -1466,10 +1380,10 @@ exit:
 				{
 					mVTHeaps[i] = new MemoryHeapBase(mPreviewFrameSize);
 					mVTBuffer[i] = new MemoryBase(mVTHeaps[i], 0, mPreviewFrameSize);
-					LOGD("mVTHeaps[%d]: ID:%d,Base:[%p],size:%d", i, mVTHeaps[i]->getHeapID(), mVTHeaps[i]->getBase() ,mVTHeaps[i]->getSize());
+					LOGD("mVTHeaps[%d]: ID:%d,Base:[%p],size:%d", i, mVTHeaps[i]->getHeapID(), mVTHeaps[i]->getBase(), mVTHeaps[i]->getSize());
 					LOGD("mVTBuffer[%d]: Pointer[%p]", i, mVTBuffer[i]->pointer());
 				} 	
-				//Assign Pointer
+				// Assign Pointer
 				v4l2_cam_buffer[i].m.userptr = (long unsigned int)mVTBuffer[i]->pointer();
 
 				// Check Memory
@@ -1491,8 +1405,8 @@ exit:
 					nCameraBuffersQueued++;	
 				}
 			}
-#endif //VT_BACKGROUND_SOLUTION    
-		}
+#endif    
+		} // end of "for" loop
 
 		type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		err = ioctl(camera_device, VIDIOC_STREAMON, &type);
@@ -1526,7 +1440,7 @@ exit:
 
 		mHeapForRotation = new MemoryHeapBase(mPreviewFrameSizeConvert);
 		mBufferForRotation = new MemoryBase(mHeapForRotation, 0, mPreviewFrameSizeConvert );
-#endif //EVE_CAM
+#endif
 
 		LOG_FUNCTION_NAME_EXIT
 
@@ -1610,10 +1524,10 @@ fail_reqbufs:
 			{
 				mVideoConversionBuffer[i].clear();
 			}
-			HAL_PRINT("MM Team - camera close ... heap cleared \n");
 
 			mHeapForRotation.clear();
 			mBufferForRotation.clear();
+#if 0			
 			if (mOverlay != NULL && true == mRecorded) 
 			{
 				HAL_PRINT("--------------------Destroy overlay now!------------------\n");
@@ -1622,6 +1536,7 @@ fail_reqbufs:
 				nOverlayBuffersQueued = 0;
 				mRecorded = false;
 			}
+#endif
 			mCounterSkipFrame = 0;
 		}
 
@@ -1643,129 +1558,6 @@ fail_reqbufs:
 	}
 #endif
 
-/* 06.11.2011 - codeworkx@cyanogenmod.com */
-/* ----------------------- START TI SOURCES ----------------------- */
-
-static void debugShowFPS()
-{
-    static int mFrameCount = 0;
-    static int mLastFrameCount = 0;
-    static nsecs_t mLastFpsTime = 0;
-    static float mFps = 0;
-    mFrameCount++;
-    if (!(mFrameCount & 0x1F)) {
-        nsecs_t now = systemTime();
-        nsecs_t diff = now - mLastFpsTime;
-        mFps =  ((mFrameCount - mLastFrameCount) * float(s2ns(1))) / diff;
-        mLastFpsTime = now;
-        mLastFrameCount = mFrameCount;
-        LOGD("####### [%d] Frames, %f FPS", mFrameCount, mFps);
-    }
-}
-
-void CameraHal::queueToOverlay(int index)
-{
-    int nBuffers_queued_to_dss = mOverlay->queueBuffer((void*)index);
-    if (nBuffers_queued_to_dss < 0) {
-        HAL_PRINT("Failed queue buffer#%d to overlay! Queue it back to camera.", index);
-        debugShowBufferStatus();
-        queueToCamera(index);
-        return;
-    }
-
-    nOverlayBuffersQueued++;
-    buffers_queued_to_dss[index] |= BUFF_Q2DSS;
-
-    if (nBuffers_queued_to_dss == nOverlayBuffersQueued) {
-        // No error.
-        return;
-    }
-
-    HAL_PRINT("Found some buffers discarded by DSS upon STREAM OFF!");
-    HAL_PRINT("nOverlayBuffersQueued=%d, nBuffers_queued_to_dss=%d",
-            nOverlayBuffersQueued, nBuffers_queued_to_dss);
-    debugShowBufferStatus();
-    //Queue all the buffers that were discarded by DSS upon STREAM OFF, back to camera.
-    for(int k = 0; k < MAX_CAMERA_BUFFERS; k++) {
-        if (k == index)
-            continue;
-
-        if (buffers_queued_to_dss[k] & BUFF_Q2DSS) {
-            buffers_queued_to_dss[k] &= ~BUFF_Q2DSS;
-            nOverlayBuffersQueued--;
-
-            queueToCamera(k);
-        }
-    }
-}
-
-int CameraHal::dequeueFromOverlay()
-{
-    overlay_buffer_t overlaybuffer;// contains the index of the buffer dque
-    if (nOverlayBuffersQueued < NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE) {
-        HAL_PRINT("skip dequeue. nOverlayBuffersQueued = %d", nOverlayBuffersQueued);
-        return -1;
-    }
-
-    int dequeue_from_dss_failed = mOverlay->dequeueBuffer(&overlaybuffer);
-    if(dequeue_from_dss_failed) {
-        HAL_PRINT("no buffer to dequeue in overlay");
-        return -1;
-    }
-
-    nOverlayBuffersQueued--;
-    buffers_queued_to_dss[(int)overlaybuffer] &= ~BUFF_Q2DSS;
-    lastOverlayBufferDQ = (int)overlaybuffer;
-
-    return (int)overlaybuffer;
-}
-
-bool CameraHal::__queueToCamera(int index, int line)
-{
-    if (0 > index || MAX_CAMERA_BUFFERS < index) {
-        HAL_PRINT("wrong index %d, line=%d", index, line);
-        return false;
-    }
-
-    if (buffers_queued_to_dss[index] != BUFF_IDLE) {
-        HAL_PRINT("ignore trying queue non-idle buffer#%d(stat=%d) to camera. line=%d",
-                index, buffers_queued_to_dss[index], line);
-        return false;
-    }
-
-    if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[index]) < 0) {
-        HAL_PRINT("VIDIOC_QBUF Failed. buffer#%d(stat=%d), line=%d", index, buffers_queued_to_dss[index],line);
-        return false;
-    }
-
-    nCameraBuffersQueued++;
-    return true;
-}
-
-int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
-{
-    struct v4l2_buffer cfilledbuffer;
-    cfilledbuffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    cfilledbuffer.memory = V4L2_MEMORY_USERPTR;
-
-    if (ioctl(camera_device, VIDIOC_DQBUF, &cfilledbuffer) < 0) {
-        HAL_PRINT("VIDIOC_DQBUF Failed!!!");
-        return -1;
-    }
-
-    nCameraBuffersQueued--;
-
-    int index = cfilledbuffer.index;
-    if (NULL != timestamp) {
-        *timestamp = s2ns(cfilledbuffer.timestamp.tv_sec) + us2ns(cfilledbuffer.timestamp.tv_usec);
-    }
-    //SaveFile(NULL, (char*)"yuv", (void *)cfilledbuffer.m.userptr, mPreviewFrameSize);
-
-    return index;
-}
-
-/* ----------------------- END TI SOURCES ----------------------- */
-
 	/*
 	//NCB-TI
 	New nextPreview() code is to make CameraHal compatible with the Inc3.4 Overlay module. 
@@ -1775,16 +1567,14 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 	 */
 	void CameraHal::nextPreview()
 	{
-		const int RETRY_COUNT = 5;
+		bool queueBufferCheck = true;
+
+		int ret, error = 0;
+
+		mapping_data_t* data = NULL; 
 		mCfilledbuffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		mCfilledbuffer.memory = V4L2_MEMORY_USERPTR;
-		int ret, queue_to_dss_failed, nBuffers_queued_to_dss;
-		overlay_buffer_t overlaybuffer;// contains the index of the buffer dque
-		int index;
-		int buffer_count;    
-		mapping_data_t* data = NULL; 
-		bool queueBufferCheck = true;
-		int error = 0;
+		overlay_buffer_t overlaybuffer;	//contains the index of the buffer deque
 
 #ifdef SAMSUNG_SECURITY
 		if(!mSamsungCamera)
@@ -1801,10 +1591,43 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 			else
 			{
 				m_cur_security++;
-				//LOGE("============= %d===============\n",m_cur_security);
 			}	
 		}
 #endif	
+
+		/* De-queue the next avaliable buffer */
+		if (ioctl(camera_device, VIDIOC_DQBUF, &mCfilledbuffer) < 0)  
+		{
+			LOGE("Camera ESD shock!!\n");
+			
+			CameraStop();
+			if(camera_device)
+			{
+				close(camera_device);
+				camera_device = NULL;
+				LOGD("Camera Driver unload done!\n");
+			}
+			if(CameraCreate(mCameraIndex) < 0){
+				LOGD("CameraCreate Failed!\n");
+				return ;
+			}
+			if(CameraConfigure() < 0){
+				LOGD("CameraConfigure Failed!\n");
+				return;
+			}
+			if(CameraStart()<0){
+				LOGD("CameraStart Failed!\n");
+				return;
+			}
+			return ;
+		}
+		else
+		{
+			if(nCameraBuffersQueued > 0) {
+            	nCameraBuffersQueued--;
+        	}
+			buffers_queued_to_camera_driver[mCfilledbuffer.index] = 0;
+		}
 
 #if OMAP_SCALE
 		if(mCameraIndex == VGA_CAMERA && mCamMode != VT_MODE && mVideoBuffer_422[mCfilledbuffer.index] != NULL)
@@ -1818,9 +1641,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 			}
 			else
 				yuv_buffer = (uint8_t*) data->ptr;
-		  //LOGE("AKMM: modify overlay address");
-		  //LOGE("AKMM: vpp_buffer is 0x%x yuv_buffer 0x%x    wid %d  ht %d",vpp_buffer,yuv_buffer , mPreviewWidth, mPreviewHeight);
-			if(scale_process(vpp_buffer, mPreviewWidth,mPreviewHeight, yuv_buffer,mPreviewWidth, mPreviewHeight  , 0, PIX_YUV422I, 1))
+			if(scale_process(vpp_buffer, mPreviewWidth,mPreviewHeight, yuv_buffer, mPreviewWidth, mPreviewHeight, 0, PIX_YUV422I, 1))
 			{
 				LOGE("scale_process() failed\n");
 			}
@@ -1829,8 +1650,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 
 		if(mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)
 		{
-
-			vpp_buffer =  (uint8_t*)mCfilledbuffer.m.userptr;
+			vpp_buffer = (uint8_t*)mCfilledbuffer.m.userptr;
 
 			if(mCamMode == VT_MODE)
 			{
@@ -1843,16 +1663,16 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 				{
 					Neon_Convert_yuv422_to_YUV420P((unsigned char *)vpp_buffer,(unsigned char *)mVideoConversionBuffer[mCfilledbuffer.index]->pointer(), mPreviewWidth, mPreviewHeight); 				
 				}
-				mDataCb( CAMERA_MSG_PREVIEW_FRAME,mVideoConversionBuffer[mCfilledbuffer.index] ,mCallbackCookie);	
-				HAL_PRINT("VTMode preview callback done!\n");
+				mDataCb(CAMERA_MSG_PREVIEW_FRAME, mVideoConversionBuffer[mCfilledbuffer.index], mCallbackCookie);	
+				// HAL_PRINT("VTMode preview callback done!\n");
 			}
 			else
 			{
-				if(mPreviewWidth!=HD_WIDTH)
+				if(mPreviewWidth != HD_WIDTH)
 				{        
 					Neon_Convert_yuv422_to_NV21((unsigned char *)vpp_buffer,(unsigned char *)mVideoConversionBuffer[mCfilledbuffer.index]->pointer(), mPreviewWidth, mPreviewHeight);
-					mDataCb( CAMERA_MSG_PREVIEW_FRAME,mVideoConversionBuffer[mCfilledbuffer.index] ,mCallbackCookie);
-					HAL_PRINT("Normal preview callback done!\n");
+					mDataCb(CAMERA_MSG_PREVIEW_FRAME, mVideoConversionBuffer[mCfilledbuffer.index], mCallbackCookie);
+					// HAL_PRINT("Normal preview callback done!\n");
 				}
 			}
 		}
@@ -1879,7 +1699,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 
 #if	CHECK_FRAMERATE
 		debugShowFPS();
-#endif  //#if CHECK_FRAMERATE
+#endif
 
 		if(true == mRecordEnabled && iOutStandingBuffersWithEncoder < 3)//dont send more than 4.
 		{
@@ -1918,7 +1738,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 						}
 #ifdef OMAP_ENHANCEMENT	 		
 						mDataCbTimestamp(mCurrentTime,CAMERA_MSG_VIDEO_FRAME,mVideoBuffer_422[mBufferCount_422],mCallbackCookie,0,0);
-						HAL_PRINT("VTMode MainCam Video callback done!\n");
+						// HAL_PRINT("VTMode MainCam Video callback done!\n");
 #endif
 					}
 					else
@@ -1926,7 +1746,7 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 						memcpy((void*)mVideoBuffer_422[mBufferCount_422]->pointer(), (void*)mCfilledbuffer.m.userptr, 176*144*2);
 #ifdef OMAP_ENHANCEMENT	 
 						mDataCbTimestamp(mCurrentTime,CAMERA_MSG_VIDEO_FRAME,mVideoBuffer_422[mBufferCount_422],mCallbackCookie,0,0);
-						HAL_PRINT("VTMode VGACam Video callback done!\n");
+						// HAL_PRINT("VTMode VGACam Video callback done!\n");
 #endif
 					}
 				}
@@ -1934,19 +1754,15 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 				{
 #ifdef OMAP_ENHANCEMENT	 
 					mDataCbTimestamp(mCurrentTime,CAMERA_MSG_VIDEO_FRAME,mVideoBuffer[(int)mCfilledbuffer.index],mCallbackCookie,0,0);
-					HAL_PRINT("Normal Video callback done!\n");
+					// HAL_PRINT("Normal Video callback done!\n");
 #endif
 				}
 			}
-
-
 			queueBufferCheck = false;
-
 		}
 		else
 		{
 			queueBufferCheck = true;
-
 			if(true == mRecordEnabled && iOutStandingBuffersWithEncoder == 3) //if opencore has 3 buffers
 			{
 				iConsecutiveVideoFrameDropCount++;
@@ -1956,54 +1772,185 @@ int CameraHal::dequeueFromCamera(nsecs_t *timestamp)
 				}
 			}
 		}
+		//Queue Buffer to Overlay    
 
-        nsecs_t timestamp;
-        index = dequeueFromCamera(&timestamp);
-        if (-1 == index) {
-            return;
-        }
+		if (!mCounterSkipFrame && mOverlay != NULL)	// Latona TD/Heron : VT_BACKGROUND_SOLUTION
+		{
+			// Normal Flow send the frame for display
+			mCounterSkipFrame = mSkipFrameNumber;   //Reset to Zero
 
-        if(msgTypeEnabled(CAMERA_MSG_PREVIEW_FRAME))
-            mDataCb(CAMERA_MSG_PREVIEW_FRAME, mPreviewBuffers[index], mCallbackCookie);
+			// Notify overlay of a new frame.	
+			if(buffers_queued_to_dss[mCfilledbuffer.index] != 1)
+			{
+				int nBuffers_queued_to_dss = mOverlay->queueBuffer((void*)mCfilledbuffer.index);
 
-        mRecordingLock.lock();
-        if (nCameraBuffersQueued == 0) {
-            LOGV("Drop the frame. Camera is starving");
-            queueToCamera(index);
-            goto queue_and_exit;
-        }
+				if (nBuffers_queued_to_dss < 0)
+				{
+					LOGE("nextPreview(): mOverlay->queueBuffer(%d) failed", mCfilledbuffer.index);
+				}
+				else
+				{
+					nOverlayBuffersQueued++;
+					buffers_queued_to_dss[mCfilledbuffer.index] = 1; //queued
+					if (nBuffers_queued_to_dss != nOverlayBuffersQueued)
+					{
+						LOGE("Before reset nBuffers_queued_to_dss = %d, nOverlayBuffersQueued = %d", nBuffers_queued_to_dss, nOverlayBuffersQueued);
+						LOGE("Before reset buffers in DSS \n %d %d %d  %d %d %d", 
+								buffers_queued_to_dss[0], 
+								buffers_queued_to_dss[1],
+								buffers_queued_to_dss[2], 
+								buffers_queued_to_dss[3], 
+								buffers_queued_to_dss[4], 
+								buffers_queued_to_dss[5]);
+						
+						int index = mCfilledbuffer.index; //NCB-TI Fix for error case queue buff fail
+						for(int k = 0; k < MAX_CAMERA_BUFFERS; k++)
+						{
+							if ((buffers_queued_to_dss[k] == 1) && (k != index))
+							{
+								buffers_queued_to_dss[k] = 0;
+								nOverlayBuffersQueued--;
+							}
+						}
+						LOGE("After reset nBuffers_queued_to_dss = %d, nOverlayBuffersQueued = %d", nBuffers_queued_to_dss, nOverlayBuffersQueued);
+						LOGE("After reset buffers in DSS \n %d %d %d  %d %d %d", 
+								buffers_queued_to_dss[0], 
+								buffers_queued_to_dss[1],
+								buffers_queued_to_dss[2], 
+								buffers_queued_to_dss[3], 
+								buffers_queued_to_dss[4], 
+								buffers_queued_to_dss[5]);
+					}
+				}
+			}
+			else
+			{
+				LOGE("NCB_DBG:Buffer already with Overlay %d",mCfilledbuffer.index);
+			}	
+			if (nOverlayBuffersQueued >= NUM_BUFFERS_TO_BE_QUEUED_FOR_OPTIMAL_PERFORMANCE)
+			{
+				if(mOverlay->dequeueBuffer(&overlaybuffer) < 0)
+				{
+					// OVL_PATCH		NCB-TI E					
+					// This patch is taken from the Halo CameraHal to handle the cases : Dequeue fail for stream OFF	
+					// Overlay went from stream on to stream off
+					// We need to reclaim all of these buffers since the video queue will be lost
+					if(mDSSActive)
+					{
+						LOGD("Overlay went from STREAM ON to STREAM OFF");
+						unsigned int nDSS_ct = 0;
+						int buffer_count =  mOverlay->getBufferCount();
+						for(int i =0; i < buffer_count ; i++)
+						{
+							LOGD("NCB_DBG:Buf Ct %d, DSS[%d] = %d, Ovl Ct %d",buffer_count,i,buffers_queued_to_dss[i],nOverlayBuffersQueued);
+							if(buffers_queued_to_dss[i] == 1)
+							{
+								// we need to find out if this buffer was queued after overlay called stream off
+								// if so, then we should not reclaim it
 
-        if(mRecordEnabled) {
-            buffers_queued_to_dss[index] |= BUFF_Q2VE;
+								if((data = (mapping_data_t*) mOverlay->getBufferAddress((void*)i)) != NULL)
+								{
+									if(!data->nQueueToOverlay)
+									{
+										nOverlayBuffersQueued--;
+										buffers_queued_to_dss[i] = 0;
+										nDSS_ct++;
+									}
+									else
+									{
+										LOGE("Trying to Reclaim[%d] to CameraHAL but is already queued to overlay", i);
+									}
+								}
+								else
+								{
+									LOGE("Error getBufferAddress couldn't return any pointer.");
+								}
+							}
+						}
 
-            // unlock mRecordingLock before sending frame to CameraService to avoid
-            // deadlock when in the same time releaseRecordingFrame is invoked.
-            mRecordingLock.unlock();
-            //mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME, mVideoBuffer[index], mCallbackCookie, 0, 0);
-            mRecordingLock.lock();
-        }
-        LOGD("HERE WE GO!!");
-        queueToOverlay(index);
+						LOGD("Done reclaiming buffers, there are [%d] buffers queued to overlay actually %d", nOverlayBuffersQueued, nDSS_ct);
+						mDSSActive = false;
+					}
+					else
+					{
+						LOGE("nextPreview(): mOverlay->dequeueBuffer() failed Ct %d\n",nOverlayBuffersQueued);									
+					}
+					//OVL_PATCH     NCB-TI X
+				}
+				else	
+				{
+					if(nOverlayBuffersQueued > 0) 
+                    	nOverlayBuffersQueued--;
+					buffers_queued_to_dss[(int)overlaybuffer] = 0;
+					lastOverlayBufferDQ = (int)overlaybuffer;
+					mDSSActive = true;	//OVL_PATCH
+				}
+			}
+		}        
+		else
+		{
+			// skip the frame for display
+			if(mCounterSkipFrame > 0)
+				mCounterSkipFrame--;
+		}
 
-queue_and_exit:
-        index = dequeueFromOverlay();
-        if(-1 == index) {
-            goto exit;
-        }
-
-        if (buffers_queued_to_dss[index] == BUFF_IDLE)
-            queueToCamera(index);
-
-exit:
-        mRecordingLock.unlock();
-
-        if (UNLIKELY(mDebugFps)) {
-            debugShowFPS();
-        }
-
-        return;
+		if(queueBufferCheck)
+		{
+			if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[mCfilledbuffer.index]) < 0) 
+			{
+				LOGE("nextPreview. VIDIOC_QBUF Failed.");
+			}
+			else
+			{
+	      		buffers_queued_to_camera_driver[mCfilledbuffer.index] = 1;   // Added for CSR - OMAPS00242402
+				nCameraBuffersQueued++;
+			}
+		}
 	}
 
+
+#if 0 //def EVE_CAM //NCB-TI
+	void CameraHal::PreviewConversion(uint8_t *pInBuffer, uint8_t *pOutBuffer)
+	{
+		if(mCameraIndex == VGA_CAMERA && mCamMode != VT_MODE && mCaptureFlag)
+		{
+			if(isStart_VPP)
+			{
+				if(ColorConvert_Process((char *)pInBuffer,(char *)pOutBuffer))
+				{
+					LOGE("ColorConvert_Process() failed\n");
+				}
+			}
+		}
+		else
+		{
+			if(!mCaptureFlag)
+			{
+				if(mCamMode == VT_MODE)
+				{
+					if(mCameraIndex == MAIN_CAMERA)
+					{
+						Neon_Convert_yuv422_to_YUV420P((unsigned char *)pInBuffer, (unsigned char*)mBufferForRotation->pointer(), mPreviewHeight, mPreviewWidth);
+						rotate90_out((unsigned char*)mBufferForRotation->pointer(), (unsigned char*)pOutBuffer, mPreviewWidth, mPreviewHeight);
+					}
+					else
+					{
+						Neon_Convert_yuv422_to_YUV420P((unsigned char *)pInBuffer, (unsigned char *)pOutBuffer, mPreviewWidth, mPreviewHeight);
+					}
+				}
+				else
+				{
+					Neon_Convert_yuv422_to_NV21((unsigned char *)pInBuffer, (unsigned char *)pOutBuffer, mPreviewWidth, mPreviewHeight);
+				}
+			}
+			else
+			{
+				HAL_PRINT("Neon_Convert() Called for Capture Case\n");
+				Neon_Convert_yuv422_to_NV21((unsigned char *)pInBuffer, (unsigned char *)pOutBuffer, mPreviewWidth, mPreviewHeight);
+			}
+		}
+	}
+#endif //EVE_CAM //NCB-TI
 
 	int CameraHal::ICaptureCreate(void)
 	{
@@ -2102,8 +2049,6 @@ exit:
 			int buffer_count = mOverlay->getBufferCount();
 			for(int i =0; i < buffer_count ; i++)
 			{
-                mPreviewBuffers[i].clear();
-                mPreviewHeaps[i].clear();
 				buffers_queued_to_dss[i] = 0;
 			}
 			// Eclair Camera L25.12
@@ -2127,12 +2072,9 @@ exit:
 				mOverlay->resizeInput(w, h);
 			}
 			// Restart the preview (Only for Overlay Case)
-			//LOGD("In else overlay");
+			// LOGD("In else overlay");
 			mPreviewRunning = false;
-			Message msg;
-			msg.command = PREVIEW_START;
-			previewThreadCommandQ.put(&msg);
-			previewThreadAckQ.get(&msg);
+			startPreview();
 		} // Eclair HAL
 
 		LOG_FUNCTION_NAME_EXIT
@@ -2150,13 +2092,10 @@ exit:
 			return UNKNOWN_ERROR;
 		}
 #endif
-
-		if(mOverlay == NULL && mCamMode != VT_MODE)
+		if(mPreviewRunning == true)
 		{
-			LOGD("Return from camera Start Preview\n");
-			mPreviewRunning = true;
-			mFalsePreview = true;
-			return NO_ERROR;
+			LOGD("%s : Preview was already running.\n", __func__);
+			return INVALID_OPERATION;
 		}
 
 		Message msg;
@@ -2426,12 +2365,16 @@ exit:
 						mVideoBuffer_422[i] = new MemoryBase(mVideoHeaps_422, i * mRecordingFrameSize, mRecordingFrameSize);
 					}		
 				}
-
-
 			}
-
 		}
-  
+/*
+		if(mPreviousFlashMode == 2){
+			setMovieFlash(FLASH_MOVIE_ON);
+		}
+		if(mPreviousFlashMode == 3){
+			setMovieFlash(FLASH_MOVIE_AUTO);
+		}
+*/       
 		mRecordingLock.lock();
 		mRecordEnabled = true;  
 		mRecorded = true;
@@ -2447,22 +2390,39 @@ exit:
 	void CameraHal::stopRecording()
 	{
 		LOG_FUNCTION_NAME
-
+/*
+		if(mPreviousFlashMode == 2) {
+			setMovieFlash(FLASH_MOVIE_OFF);
+		}
+		if(mPreviousFlashMode == 3) {
+			setMovieFlash(FLASH_MOVIE_OFF);
+		}
+*/
 		mRecordingLock.lock();
 		mRecordEnabled = false;
 		mCurrentTime = 0;
-	
-        // Return all buffers queued to VE back to camera. Otherwise, after few
-        // recordings, camera is left without buffers.
-		//int mVideoBufferCount = mOverlay->getBufferCount();
-        for (int i = 0; i < mVideoBufferCount; i++) {
-            if ((buffers_queued_to_dss[i]&BUFF_Q2VE) == BUFF_Q2VE) {
-                LOGD("Recovering Buffer[%d] status[%d] \n", i, buffers_queued_to_dss[i]);
-                buffers_queued_to_dss[i] &= ~BUFF_Q2VE;
-                queueToCamera(i);
-            }
-        }
-			
+		
+		#if 1			// fix for OMAPS00242402
+		int buffer_count = mOverlay->getBufferCount();
+		for (int i = 0; i < buffer_count ; i++) 
+		{
+			if (buffers_queued_to_camera_driver[i] == 0)
+			{
+				if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[i]) >= 0) 
+				{
+			    	buffers_queued_to_camera_driver[i] = 1;     // Added for CSR - OMAPS00242402
+					nCameraBuffersQueued++;					
+				}
+			 }
+
+			 if (nCameraBuffersQueued >= buffer_count )
+			 {
+				HAL_PRINT("All Buffers with driver nCameraBuffersQueued %d, buffer_count %d,  i %d",nCameraBuffersQueued,buffer_count,i);
+				break;
+			 }
+		}
+		#endif
+		
 		mRecordingLock.unlock();
 
 		LOG_FUNCTION_NAME_EXIT
@@ -2475,35 +2435,47 @@ exit:
 
 	void CameraHal::releaseRecordingFrame(const sp<IMemory>& mem)
 	{
-        int index;
+		int index;
 
-        for(index = 0; index < mVideoBufferCount; index++){
-            if(mem->pointer() == mVideoBuffer[index]->pointer()) {
-                break;
-            }
-        }
+		mRecordingLock.lock();
 
-        if (index == mVideoBufferCount)
-        {
-            LOGD("Encoder returned wrong buffer address");
-            return;
-        }
+		if(mCamMode == VT_MODE)
+		{
+			for(index = 0; index < mVideoBufferCount; index ++)
+			{
+				if(mem->pointer() == mVideoBuffer_422[index]->pointer()) 
+				{
+					break;
+				}
+			}
+		}
+		else
+		{
+			for(index = 0; index < mVideoBufferCount; index ++)
+			{
+				if(mem->pointer() == mVideoBuffer[index]->pointer()) 
+				{
+					break;
+				}
+			}
+		}
 
-        if (0 == (buffers_queued_to_dss[index] & BUFF_Q2VE)) {
-            LOGW("Buffer#%d(stat=%d) not queued to VE.", index, buffers_queued_to_dss[index]);
-            return;
-        }
+		mRecordingFrameCount++;
+		iOutStandingBuffersWithEncoder--;
 
-        debugShowFPS();
+		mRecordingLock.unlock();
 
-        mRecordingLock.lock();
+		if (ioctl(camera_device, VIDIOC_QBUF, &v4l2_cam_buffer[index]) < 0)
+		{
+			LOGE("VIDIOC_QBUF Failed, index [%d] line=%d",index,__LINE__);
+		}
+		else
+		{
+      		buffers_queued_to_camera_driver[index] = 1;		// Added for CSR - OMAPS00242402
+			nCameraBuffersQueued++;
+		}
 
-        buffers_queued_to_dss[index] &= ~BUFF_Q2VE;
-        queueToCamera(index);
-
-        mRecordingLock.unlock();
-
-        return;
+		return ;
 	}
 
 	sp<IMemoryHeap>  CameraHal::getRawHeap() const
@@ -2548,16 +2520,11 @@ exit:
 
 	status_t CameraHal::setParameters(const CameraParameters &params)
 	{
-		HAL_PRINT("setParameters() ENTER\n");
+		LOG_FUNCTION_NAME
 
 		int w, h;
 	    int fps_min, fps_max;
 		int framerate;
-		int iso, af, mode, zoom, wb, exposure, scene;
-		int effects, compensation, saturation, sharpness;
-		int contrast, brightness, flash, caf;
-		int error;
-		Message msg;
 
 		Mutex::Autolock lock(mLock);
 
@@ -2578,42 +2545,21 @@ exit:
 			return -EINVAL;
 		}
 
-		framerate = params.getPreviewFrameRate();
-		if(framerate != mParameters.getPreviewFrameRate() )
-		{
-			mParameters.setPreviewFrameRate(framerate);
-		}
-		HAL_PRINT("FRAMERATE %d\n", framerate);
-
-		mMMSApp= params.getInt("MMS_APP");
-		if (mMMSApp != 10)
-		{
-			mMMSApp = 0;
-		}
-		HAL_PRINT("mMMSApp =%d\n",mMMSApp);
-
-		params.getPreviewSize(&w, &h);
+		params.getPreviewSize(&w, &h);		
+	    HAL_PRINT("Preview Size by App %d x %d\n", w, h);
 	    if (!validateSize(w, h)) {
-	        LOGE("Preview Size not supported\n");
+	        LOGE("Preview Size not supported (%d x %d)\n", w, h);
 	        return UNKNOWN_ERROR;
 	    }
-	    HAL_PRINT("Preview Size by App %d x %d\n", w, h);
 
 	    params.getPictureSize(&w, &h);
+	    HAL_PRINT("Picture Size by App %d x %d\n", w, h);
 	    if (!validateSize(w, h)) {
-	        LOGE("Picture Size not supported\n");
+	        LOGE("Picture Size not supported (%d x %d)\n", w, h);
 	        return UNKNOWN_ERROR;
 	    }
-	    HAL_PRINT("Picture Size by App %d x %d\n", w, h);
 		
 		mParameters = params;
-
-		mParameters.getPreviewFpsRange(&fps_min, &fps_max);
-    	if ((fps_min > fps_max) || (fps_min < 0) || (fps_max < 0)) {
-        	LOGE("WARN(%s): request for preview frame is not initial. \n",__func__);
-        	return UNKNOWN_ERROR;
-    	}
-    	HAL_PRINT("FRAMERATE RANGE %d ~ %d\n", fps_min, fps_max);
 
 		mParameters.getPictureSize(&w, &h);
 		HAL_PRINT("Picture Size by CamHal %d x %d\n", w, h);
@@ -2651,45 +2597,51 @@ exit:
 			}	 
 		}
 
+		mParameters.getPreviewFpsRange(&fps_min, &fps_max);
+    	if ((fps_min > fps_max) || (fps_min < 0) || (fps_max < 0)) {
+        	LOGE("WARN(%s): request for preview frame is not initial. \n",__func__);
+        	return UNKNOWN_ERROR;
+    	} else 	{
+			mParameters.setPreviewFrameRate(fps_max/1000);
+    	}
+    	HAL_PRINT("Framerate Range %d ~ %d\n", fps_min, fps_max);
+
 		quality = params.getInt("jpeg-quality");
 		if ( ( quality < 0 ) || (quality > 100) )
 		{
 			quality = 100;
 		} 
 
-
 		mPreviewFrameSkipValue = getPreviewFrameSkipValue();
 
-		//if(strcmp(getSceneMode(),"auto") == 0)
-		{
-			if(setWB(getWBLighting()) < 0) return UNKNOWN_ERROR;
-			if(setEffect(getEffect()) < 0) return UNKNOWN_ERROR;
-			if(mCamMode != CAMCORDER_MODE)
-			{
-				if(mSamsungCamera)
-				{
-					if(setISO(getISO()) < 0) return UNKNOWN_ERROR;
-				}
-			}
-			if(mSamsungCamera)
-			{		
-				if(setSaturation(getSaturation()) < 0) 	return UNKNOWN_ERROR;
-				if(setSharpness(getSharpness()) < 0) 	return UNKNOWN_ERROR;
-			}
-		}
-
-		if(setAntiBanding(getAntiBanding()) < 0)	return UNKNOWN_ERROR;
-		if(setSceneMode(getSceneMode()) < 0) 		return UNKNOWN_ERROR;
-		if(setExposure(getExposure()) < 0) 			return UNKNOWN_ERROR;
-		if(setZoom(getZoomValue()) < 0) 			return UNKNOWN_ERROR;
-		if(setFocusMode(getFocusMode()) < 0) 		return UNKNOWN_ERROR;
-		if(setGPSLatitude(getGPSLatitude()) < 0) 	return UNKNOWN_ERROR;
-		if(setGPSLongitude(getGPSLongitude()) < 0) 	return UNKNOWN_ERROR;
-		if(setGPSAltitude(getGPSAltitude()) < 0) 	return UNKNOWN_ERROR;
-		if(setGPSTimestamp(getGPSTimestamp()) < 0) 	return UNKNOWN_ERROR;
-		if(setGPSProcessingMethod(getGPSProcessingMethod()) < 0) 	return UNKNOWN_ERROR;
-		if(setJpegThumbnailSize(getJpegThumbnailSize()) < 0) 		return UNKNOWN_ERROR;		
-		//	setFlashMode(getFlashMode());
+		if(setWB(getWBLighting()) < 0) 
+			return UNKNOWN_ERROR;
+		if(setEffect(getEffect()) < 0) 
+			return UNKNOWN_ERROR;
+		if(setAntiBanding(getAntiBanding()) < 0)	
+			return UNKNOWN_ERROR;
+		if(setSceneMode(getSceneMode()) < 0) 		
+			return UNKNOWN_ERROR;
+		if(setExposure(getExposure()) < 0) 			
+			return UNKNOWN_ERROR;
+		if(setZoom(getZoomValue()) < 0) 			
+			return UNKNOWN_ERROR;
+		if(setFocusMode(getFocusMode()) < 0) 		
+			return UNKNOWN_ERROR;
+		if(setGPSLatitude(getGPSLatitude()) < 0) 	
+			return UNKNOWN_ERROR;
+		if(setGPSLongitude(getGPSLongitude()) < 0) 	
+			return UNKNOWN_ERROR;
+		if(setGPSAltitude(getGPSAltitude()) < 0) 	
+			return UNKNOWN_ERROR;
+		if(setGPSTimestamp(getGPSTimestamp()) < 0) 	
+			return UNKNOWN_ERROR;
+		if(setGPSProcessingMethod(getGPSProcessingMethod()) < 0) 	
+			return UNKNOWN_ERROR;
+		if(setJpegThumbnailSize(getJpegThumbnailSize()) < 0) 		
+			return UNKNOWN_ERROR;		
+	//	if(setFlashMode(getFlashMode())
+	//		return UNKNOWN_ERROR;
 
 		if(mCamMode != CAMCORDER_MODE && mCamMode != VT_MODE)
 		{
@@ -2698,18 +2650,33 @@ exit:
 
 		if(mSamsungCamera)
 		{
-			if(setBrightness(getBrightness()) < 0)	return UNKNOWN_ERROR;
-			if(setContrast(getContrast()) < 0) 		return UNKNOWN_ERROR;
-			if(setMetering(getMetering()) < 0) 		return UNKNOWN_ERROR;
-			if(setPrettyMode(getPrettyValue()) < 0) return UNKNOWN_ERROR;	
-			if(setWDRMode(getWDRMode()) < 0) 		return UNKNOWN_ERROR;
-			if(setAntiShakeMode(getAntiShakeMode()) < 0)	return UNKNOWN_ERROR;		
+			if(setBrightness(getBrightness()) < 0)	
+				return UNKNOWN_ERROR;
+			if(setContrast(getContrast()) < 0) 		
+				return UNKNOWN_ERROR;
+			if(setMetering(getMetering()) < 0) 		
+				return UNKNOWN_ERROR;
+			if(setPrettyMode(getPrettyValue()) < 0) 
+				return UNKNOWN_ERROR;	
+			if(setWDRMode(getWDRMode()) < 0) 		
+				return UNKNOWN_ERROR;
+			if(setAntiShakeMode(getAntiShakeMode()) < 0)	
+				return UNKNOWN_ERROR;	
+			if(setSaturation(getSaturation()) < 0) 	
+				return UNKNOWN_ERROR;
+			if(setSharpness(getSharpness()) < 0) 	
+				return UNKNOWN_ERROR;
+			if(mCamMode != CAMCORDER_MODE)
+			{
+				if(setISO(getISO()) < 0) 
+					return UNKNOWN_ERROR;
+			}
 			// chk_dataline
 			m_chk_dataline = mParameters.getInt("chk_dataline");
 			HAL_PRINT("\n == m_chk_dataline == %d\n",m_chk_dataline);
 		}
 
-		HAL_PRINT("setParameters() EXIT\n");
+		LOG_FUNCTION_NAME_EXIT
 		return NO_ERROR;
 	}
 
@@ -3083,7 +3050,7 @@ exit:
 
 			if(strcmp(wb, wb_value[mPreviousWB]) !=0)
 			{
-				HAL_PRINT("myungwoo mPreviousWB =%d wb=%s\n", mPreviousWB,wb);
+				HAL_PRINT("setWB : mPreviousWB =%d wb=%s\n", mPreviousWB,wb);
 				for (i = 1; i < MAX_WBLIGHTING_EFFECTS; i++) 
 				{
 					if (! strcmp(wb_value[i], wb)) 
@@ -3127,7 +3094,7 @@ exit:
 			int i = 1;
 			if(strcmp(effect, color_effects[mPreviousEffect]) !=0)
 			{
-				HAL_PRINT("myungwoo mPreviousEffect =%d effect=%s\n", mPreviousEffect,effect); 
+				HAL_PRINT("setEffect : mPreviousEffect =%d effect=%s\n", mPreviousEffect,effect); 
 				for(i = 1; i < MAX_COLOR_EFFECTS; i++) 
 				{
 					if (! strcmp(color_effects[i], effect)) 
@@ -4046,13 +4013,13 @@ exit:
 			brightnessValue = atoi(mParameters.get("brightness"));
 			if(brightnessValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getbrightness not null int = %d \n", brightnessValue);
+				HAL_PRINT("getbrightness not null int = %d \n", brightnessValue);
 			}
 			return brightnessValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getbrightness null \n");
+			HAL_PRINT("getbrightness null \n");
 			return 0;
 		}
 	}
@@ -4065,13 +4032,13 @@ exit:
 			exposureValue = atoi(mParameters.get(mParameters.KEY_EXPOSURE_COMPENSATION));
 			if(exposureValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getExposure not null int = %d \n", exposureValue);
+				HAL_PRINT("getExposure not null int = %d \n", exposureValue);
 			}
 			return exposureValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getExposure null \n");
+			HAL_PRINT("getExposure null \n");
 			return 0;
 		}
 	}
@@ -4085,13 +4052,13 @@ exit:
 
 			if( zoomValue != 0 )
 			{
-				HAL_PRINT("CameraParameters.cpp :: ZOOM Value not null int = %d \n", zoomValue);
+				HAL_PRINT("getZoomValue not null int = %d \n", zoomValue);
 			}
 			return zoomValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: ZOOM Value null \n");
+			HAL_PRINT("getZoomValue null \n");
 			return 0;
 		}
 	}
@@ -4104,13 +4071,13 @@ exit:
 			gpsLatitudeValue = atof(mParameters.get(mParameters.KEY_GPS_LATITUDE));
 			if(gpsLatitudeValue != 0)
 			{
-				HAL_PRINT("CameraParameters.cpp :: gpsLatitudeValue = %2.2f \n", gpsLatitudeValue);
+				HAL_PRINT("getGPSLatitude = %2.2f \n", gpsLatitudeValue);
 			}
 			return gpsLatitudeValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: gpsLatitudeValue null \n");
+			HAL_PRINT("getGPSLatitude null \n");
 			return 0;
 		}
 	}
@@ -4123,13 +4090,13 @@ exit:
 			gpsLongitudeValue = atof(mParameters.get(mParameters.KEY_GPS_LONGITUDE));
 			if(gpsLongitudeValue != 0)
 			{
-				HAL_PRINT("CameraParameters.cpp :: gpsLongitudeValue = %2.2f \n", gpsLongitudeValue);
+				HAL_PRINT("getGPSLongitude = %2.2f \n", gpsLongitudeValue);
 			}
 			return gpsLongitudeValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: gpsLongitudeValue null \n");
+			HAL_PRINT("getGPSLongitude null \n");
 			return 0;
 		}
 	}
@@ -4142,13 +4109,13 @@ exit:
 			gpsAltitudeValue = atof(mParameters.get(mParameters.KEY_GPS_ALTITUDE));
 			if(gpsAltitudeValue != 0)
 			{
-				HAL_PRINT("CameraParameters.cpp :: gpsAltitudeValue = %2.2f \n", gpsAltitudeValue);
+				HAL_PRINT("getGPSAltitude = %2.2f \n", gpsAltitudeValue);
 			}
 			return gpsAltitudeValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: gpsAltitudeValue null \n");
+			HAL_PRINT("getGPSAltitude null \n");
 			return 0;
 		}
 	}
@@ -4161,13 +4128,13 @@ exit:
 			gpsTimestampValue = atol(mParameters.get(mParameters.KEY_GPS_TIMESTAMP));
 			if(gpsTimestampValue != 0)
 			{
-				HAL_PRINT("CameraParameters.cpp :: getGPSTimestamp = %ld \n", gpsTimestampValue);
+				HAL_PRINT("getGPSTimestamp = %ld \n", gpsTimestampValue);
 			}
 			return gpsTimestampValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: getGPSTimestamp null \n");
+			HAL_PRINT("getGPSTimestamp null \n");
 			return 0;
 		}
 	}
@@ -4185,13 +4152,13 @@ exit:
 			contrastValue = atoi(mParameters.get("contrast"));
 			if(contrastValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp contrastValue not null int = %d \n", contrastValue);
+				HAL_PRINT("getContrast not null int = %d \n", contrastValue);
 			}
 			return contrastValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp contrast null \n");
+			HAL_PRINT("getContrast null \n");
 			return 0;
 		}
 	}
@@ -4204,13 +4171,13 @@ exit:
 			saturationValue = atoi(mParameters.get("saturation"));
 			if(saturationValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp saturationValue not null int = %d \n", saturationValue);
+				HAL_PRINT("getSaturation not null int = %d \n", saturationValue);
 			}
 			return saturationValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp saturation null \n");
+			HAL_PRINT("getSaturation null \n");
 			return 0;
 		}
 	}
@@ -4223,13 +4190,13 @@ exit:
 			sharpnessValue = atoi(mParameters.get("sharpness"));
 			if(sharpnessValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp sharpnessValue not null int = %d \n", sharpnessValue);
+				HAL_PRINT("getSharpness not null int = %d \n", sharpnessValue);
 			}
 			return sharpnessValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp sharpness null \n");
+			HAL_PRINT("getSharpness null \n");
 			return 0;
 		}
 	}
@@ -4242,13 +4209,13 @@ exit:
 			wdrValue = atoi(mParameters.get("wdr"));
 			if(wdrValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp wdrValue not null int = %d \n", wdrValue);
+				HAL_PRINT("getWDR not null int = %d \n", wdrValue);
 			}
 			return wdrValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp wdr null \n");
+			HAL_PRINT("getWDR null \n");
 			return 0;
 		}
 	}
@@ -4261,13 +4228,13 @@ exit:
 			antiShakeValue = atoi(mParameters.get("anti-shake"));
 			if(antiShakeValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp antiShakeValue not null int = %d \n", antiShakeValue);
+				HAL_PRINT("getAntiShake not null int = %d \n", antiShakeValue);
 			}
 			return antiShakeValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp anti-shake null \n");
+			HAL_PRINT("getAntiShake null \n");
 			return 0;
 		}
 	}
@@ -4296,13 +4263,13 @@ exit:
 			isoValue = atoi(mParameters.get("iso"));
 			if(isoValue!=0)
 			{
-				HAL_PRINT("in CameraParameters.cpp iso not null int = %d \n", isoValue);
+				HAL_PRINT("getISO not null int = %d \n", isoValue);
 			}
 			return isoValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp iso null \n");
+			HAL_PRINT("getISO null \n");
 			return 0;
 		}
 	}
@@ -4316,13 +4283,13 @@ exit:
 			CameraSelectValue = atoi(mParameters.get("camera-id"));
 			if(CameraSelectValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getCameraSelect not null int = %d \n", CameraSelectValue);
+				HAL_PRINT("getCameraSelect not null int = %d \n", CameraSelectValue);
 			}
 			return CameraSelectValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp camera-id null \n");
+			HAL_PRINT("camera-id null \n");
 			return 0;
 		}
 	}
@@ -4335,13 +4302,13 @@ exit:
 			camcorderPreviewValue = atoi(mParameters.get("CamcorderPreviewMode"));
 			if(camcorderPreviewValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getCamcorderPreviewValue not null int = %d \n", camcorderPreviewValue);
+				HAL_PRINT("getCamcorderPreviewValue not null int = %d \n", camcorderPreviewValue);
 			}
 			return camcorderPreviewValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getCamcorderPreviewValue null \n");
+			HAL_PRINT("getCamcorderPreviewValue null \n");
 			return 0;
 		}
 	}
@@ -4354,13 +4321,13 @@ exit:
 			vtModeValue = atoi(mParameters.get("vtmode"));
 			if(vtModeValue != 0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getVTMode not null int = %d \n", vtModeValue);
+				HAL_PRINT("getVTMode not null int = %d \n", vtModeValue);
 			}
 			return vtModeValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getVTMode null \n");
+			HAL_PRINT("getVTMode null \n");
 			return 0;
 		}
 	}
@@ -4373,13 +4340,13 @@ exit:
 			prettyValue = atoi(mParameters.get("pretty"));
 			if(prettyValue != 0)
 			{
-				HAL_PRINT("CameraParameters.cpp :: pretty Value not null int = %d \n", prettyValue);
+				HAL_PRINT("getPretty Value not null int = %d \n", prettyValue);
 			}
 			return prettyValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: pretty Value null \n");
+			HAL_PRINT("getPretty Value null \n");
 			return 0;
 		}
 	}
@@ -4392,13 +4359,13 @@ exit:
 			previewFrameSkipValue = atoi(mParameters.get("previewframeskip"));
 			if(previewFrameSkipValue != 0)
 			{
-				HAL_PRINT("CameraParameters.cpp :: previewFrameSkip Value not null int = %d \n", previewFrameSkipValue);
+				HAL_PRINT("getPreviewFrameSkip not null int = %d \n", previewFrameSkipValue);
 			}
 			return previewFrameSkipValue;
 		}
 		else
 		{
-			HAL_PRINT("CameraParameters.cpp :: previewFrameSkip Value null \n");
+			HAL_PRINT("getPreviewFrameSkip Value null \n");
 			return 0;
 		}
 	}
@@ -4441,13 +4408,13 @@ exit:
 			twoSecondReviewModeValue = atoi(mParameters.get("twosecondreviewmode"));
 			if(twoSecondReviewModeValue!=0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getTwoSecondReviewMode not null int = %d \n", twoSecondReviewModeValue);
+				HAL_PRINT("getTwoSecondReviewMode not null int = %d \n", twoSecondReviewModeValue);
 			}
 			return twoSecondReviewModeValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getTwoSecondReviewMode null \n");
+			HAL_PRINT("getTwoSecondReviewMode null \n");
 			return 0;
 		}
 	}
@@ -4460,13 +4427,13 @@ exit:
 			previewFlashOn = atoi(mParameters.get("previewflashon"));
 			if(previewFlashOn!=0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getPreviewFlashOn not null int = %d \n", previewFlashOn);
+				HAL_PRINT("getPreviewFlashOn not null int = %d \n", previewFlashOn);
 			}
 			return previewFlashOn;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getPreviewFlashOn null \n");
+			HAL_PRINT("getPreviewFlashOn null \n");
 			return 0;
 		}
 	}
@@ -4479,13 +4446,13 @@ exit:
 			cropValue = atoi(mParameters.get("setcrop"));
 			if(cropValue!=0)
 			{
-				HAL_PRINT("in CameraParameters.cpp crop not null int = %d \n", cropValue);
+				HAL_PRINT("getCropValue not null int = %d \n", cropValue);
 			}
 			return cropValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp crop null \n");
+			HAL_PRINT("getCropValue null \n");
 			return 0;
 		}
 	}
@@ -4535,13 +4502,13 @@ exit:
 			samsungCameraValue = atoi(mParameters.get("samsungcamera"));
 			if(samsungCameraValue!=0)
 			{
-				HAL_PRINT("in CameraParameters.cpp samsungcamera not null int = %d \n", samsungCameraValue);
+				HAL_PRINT("getSamsungCameraValue not null int = %d \n", samsungCameraValue);
 			}
 			return samsungCameraValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp samsungcamera null \n");
+			HAL_PRINT("getSamsungCameraValue samsungcamera null \n");
 			return 0;
 		}
 	}
@@ -4597,13 +4564,13 @@ exit:
 			rotationValue = atoi(mParameters.get(mParameters.KEY_ROTATION));
 			if(rotationValue!=0)
 			{
-				HAL_PRINT("in CameraParameters.cpp getRotation not null int = %d \n", rotationValue);
+				HAL_PRINT("getOrientation not null int = %d \n", rotationValue);
 			}
 			return rotationValue;
 		}
 		else
 		{
-			HAL_PRINT("in CameraParameters.cpp getRotation null \n");
+			HAL_PRINT("getOrientaion null \n");
 			return 0;
 		}
 	}
@@ -4918,17 +4885,23 @@ exit:
 	}
 #endif //EVE_CAM 	
 
-#ifdef DEBUG_LOG
-    void CameraHal::debugShowBufferStatus()
-    {
-        LOGE("nOverlayBuffersQueued=%d", nOverlayBuffersQueued);
-        LOGE("nCameraBuffersQueued=%d", nCameraBuffersQueued);
-        LOGE("mVideoBufferCount=%d", mVideoBufferCount);
-        for (int i=0; i< VIDEO_FRAME_COUNT_MAX; i++) {
-            LOGE("mVideoBufferStatus[%d]=%d", i, mVideoBufferStatus[i]);
-        }
-    }
-#endif
+	static void debugShowFPS()
+	{
+		static int mFrameCount = 0;
+		static int mLastFrameCount = 0;
+		static nsecs_t mLastFpsTime = 0;
+		static float mFps = 0;
+		mFrameCount++;
+		if (mFrameCount==150) 
+		{
+			nsecs_t now = systemTime();
+			nsecs_t diff = now - mLastFpsTime;
+			mFps =  (mFrameCount * float(s2ns(1))) / diff;
+			mLastFpsTime = now;
+			LOGD("####### [%d] Frames, %f FPS\n", mFrameCount, mFps);
+			mFrameCount = 0;
+		}
+	}
 
 	static CameraInfo sCameraInfo[] = {
 		{
@@ -4937,7 +4910,7 @@ exit:
 		},
 		{
 			CAMERA_FACING_FRONT,
-			0,  /* orientation */
+			270,  /* orientation */
 		}
 	};
 

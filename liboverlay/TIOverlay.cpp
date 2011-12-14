@@ -19,10 +19,10 @@
  */
 
 #define LOG_TAG "TIOverlay"
-#define LOG_NDEBUG 0
+
 #include <hardware/hardware.h>
 #include <hardware/overlay.h>
-#define CHRIS_SDC_WAA
+
 extern "C" {
 #include "v4l2_utils.h"
 }
@@ -34,7 +34,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "../include/videodev2.h"
+#include <linux/videodev.h>
 
 #include <cutils/log.h>
 #include <cutils/ashmem.h>
@@ -42,50 +42,34 @@ extern "C" {
 #include "overlay_common.h"
 #include "TIOverlay.h"
 
-
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 #define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
 
 #ifdef TARGET_OMAP4
-//currently picoDLP is excluded, till it is thoroughly validated with .35 kernel
+#ifdef KERNEL_35_WA
 #define MAX_DISPLAY_CNT 3
+#else
+#define MAX_DISPLAY_CNT 4
+#endif
 #define MAX_MANAGER_CNT 3
 #define PANEL_NAME_FOR_TV "hdmi"
 
 #else
-#define MAX_DISPLAY_CNT 1
+#define MAX_DISPLAY_CNT 2
 #define MAX_MANAGER_CNT 2
 #define PANEL_NAME_FOR_TV "tv"
 #endif
 
-const int KCloneDevice = OVERLAY_ON_PRIMARY;
+// TI PATCH OMAPS00228762
+#define MAX_NUM_OVL_TRY 5
 
 static displayPanelMetaData screenMetaData[MAX_DISPLAY_CNT];
 static displayManagerMetaData managerMetaData[MAX_MANAGER_CNT];
 
-/* LGE_CHANGE_S, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-#define OVERLAY_COMPETE_WORKAROUND // temporary patch
-#ifdef OVERLAY_COMPETE_WORKAROUND
-struct overlay_compete {
-	int id;
-	int opened;
-};
-static struct overlay_compete current_overlay;
-static struct overlay_compete before_overlay;
-static int first_run = 1;
-
-pthread_mutex_t     request_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t	    destroy_cond = PTHREAD_COND_INITIALIZER;
-
-struct timespec timeout;
-struct timeval now;
-#endif
-/* LGE_CHANGE_E, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-
 /*****************************************************************************/
 
-#define LOG_FUNCTION_NAME_ENTRY    LOGD(" ###### Calling %s() ++ ######",  __FUNCTION__);	//shinuk.lee_to_check_overlay_error_LOGV_to_LOGD
-#define LOG_FUNCTION_NAME_EXIT    LOGD(" ###### Calling %s() -- ######",  __FUNCTION__);		//shinuk.lee_to_check_overlay_error_LOGV_to_LOGD
+#define LOG_FUNCTION_NAME_ENTRY    LOGD(" ###### Calling %s() ++ ######",  __FUNCTION__);
+#define LOG_FUNCTION_NAME_EXIT    LOGD(" ###### Calling %s() -- ######",  __FUNCTION__);
 
 /** This variable is to make sure that the overlay control device is opened
 * only once from the surface flinger process;
@@ -114,7 +98,7 @@ struct overlay_module_t HAL_MODULE_INFO_SYM = {
 };
 
 int sysfile_write(const char* pathname, const void* buf, size_t size) {
-    int fd = open(pathname, O_WRONLY);
+    int fd = open(pathname, O_RDWR);
     if (fd == -1) {
         LOGE("Can't open [%s]", pathname);
         return -1;
@@ -133,13 +117,7 @@ int sysfile_write(const char* pathname, const void* buf, size_t size) {
 }
 
 int sysfile_read(const char* pathname, void* buf, size_t size) {
-//LGE_CHANGE_S [sunggyun.yu@lge.com] 2011-01-28, fixed error on openning read-only file
-#ifdef CHRIS_SDC_WAA
-    int fd = open(pathname, O_RDONLY);
-#else
     int fd = open(pathname, O_RDWR);
-#endif
-//LGE_CHANGE_E [sunggyun.yu@lge.com] 2011-01-28, fixed error on openning read-only file
     if (fd == -1) {
         LOGE("Can't open the file[%s]", pathname);
         return -1;
@@ -328,13 +306,11 @@ overlay_object* overlay_control_context_t::open_shared_overlayobj(int ovlyfd, in
 }
 
 
-#include <stdlib.h>
 /**
 * Precondition:
 * This function has to be called after setting the crop window parameters
 */
-void overlay_control_context_t::calculateWindow(overlay_object *overlayobj, overlay_ctrl_t *finalWindow, \
-                                                int panelId, bool isCtrlpath)
+void overlay_control_context_t::calculateWindow(overlay_object *overlayobj, overlay_ctrl_t *finalWindow)
 {
     LOG_FUNCTION_NAME_ENTRY
     overlay_ctrl_t   *stage  = overlayobj->staging();
@@ -345,120 +321,33 @@ void overlay_control_context_t::calculateWindow(overlay_object *overlayobj, over
     * maintain the aspect ratio decided by media player
     */
     uint32_t dummy, w2, h2;
-    overlay_ctrl_t   *data   = overlayobj->data();
-    int fd;
-    uint32_t tempW, tempH;
-    char displayCode[16];
-    char displayMode[16];
-    char displayCodepath[PATH_MAX];
-    int interlaceMultiplier = 1;
-    int index = 0;
-
     if (sscanf(screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displaytimings, "%u,%u/%u/%u/%u,%u/%u/%u/%u\n",
         &dummy, &w2, &dummy, &dummy, &dummy, &h2, &dummy, &dummy, &dummy) != 9) {
         w2 = finalWindow->posW;
         h2 = finalWindow->posH; /* use default value, if could not read timings */
     }
-    LOGD("calculateWindow(): w2=%d, h2=%d", w2, h2);
-
-    switch (panelId) {
+    switch (stage->panel) {
         case OVERLAY_ON_PRIMARY:
         case OVERLAY_ON_SECONDARY:
         case OVERLAY_ON_PICODLP:
-            LOGE("calculateWindow(): Nothing to Adjust");
-#if 0	// Tushar
-            // Adjust the coordinate system to match the V4L change
-            switch ( data->rotation ) {
-            case 90:
-            case 270:
-#ifdef TARGET_OMAP4
-                finalWindow->posX = data->posX;
-                finalWindow->posY = data->posY;
-                finalWindow->posW = data->posH;
-                finalWindow->posH = data->posW;
-#else
-                finalWindow->posX = data->posY;
-                finalWindow->posY = data->posX;
-                finalWindow->posW = data->posH;
-                finalWindow->posH = data->posW;
-#endif
-                break;
-            case 180:
-                finalWindow->posX = data->posX;
-                finalWindow->posY = data->posY;
-                finalWindow->posW = data->posW;
-                finalWindow->posH = data->posH;
-                break;
-            default: // 0
-                finalWindow->posX = data->posX;
-                finalWindow->posY = data->posY;
-                finalWindow->posW = data->posW;
-                finalWindow->posH = data->posH;
-                break;
-           }
-#endif
+            LOGE("Nothing to Adjust");
+            //This is  added as a place holder for future enhancements if any required
             break;
         case OVERLAY_ON_TV:
             {
+                finalWindow->posX = 0;
+                finalWindow->posY= 0;
 #ifdef TARGET_OMAP4
-                for (index = 0;index < MAX_DISPLAY_CNT; index++) {
-                    if (strcmp(screenMetaData[index].displayname, "hdmi") == 0) {
-                        LOGD("found Panel Id @ [%d]", index);
-                        break;
-                    }
-                }
-                sprintf(displayCodepath, "/sys/devices/platform/omapdss/display%d/code", index);
-                if (sysfile_read(displayCodepath, displayMode, PATH_MAX) < 0) {
-                    LOGE("HDMI Code get failed");
-                    return;
-                }
-                if(!strncmp(displayMode, "CEA:", 4)) {
-                    strcpy(displayCode, displayMode+4);
-                    switch (atoi(displayCode)) {
-                        case 20:
-                        case 5:
-                        case 6:
-                        case 21:
-                            interlaceMultiplier = 2;
-                            break;
-                        default:
-                            break;
-                    }
-                }
-               /**
-                * For interlaced mode of the TV, modify the timings read, to convert them into
-                * progressive and finally update final window height for Interlaced mode
-                */
-                if ((overlayobj->mData.cropH > 720) || (overlayobj->mData.cropW > 1280) \
-                    || (overlayobj->data()->rotation % 180)) {
-                    //since no downscaling on TV, for 1080p resolution we go for full screen
-                    finalWindow->posX = 0;
-                    finalWindow->posY = 0;
-                    w2 = w2;
-                    h2 = h2 * interlaceMultiplier;
-                } else {
-                    finalWindow->posX = (w2 * overlayobj->data()->posX)/LCD_WIDTH;
-                    finalWindow->posY=  ((h2 * interlaceMultiplier) * overlayobj->data()->posY)/LCD_HEIGHT;
-
-                    w2 = (w2 * overlayobj->data()->posW) / LCD_WIDTH;
-                    h2 = ((h2 * interlaceMultiplier) * overlayobj->data()->posH) / LCD_HEIGHT;
-                }
-
                 if (overlayobj->mData.cropW * h2 > w2 * overlayobj->mData.cropH) {
                     finalWindow->posW= w2;
                     finalWindow->posH= overlayobj->mData.cropH * w2 / overlayobj->mData.cropW;
-                    if (finalWindow->posY == 0)
-                        finalWindow->posY = (h2 - finalWindow->posH) / 2;
+                    finalWindow->posY = (h2 - finalWindow->posH) / 2;
                 } else {
                     finalWindow->posH = h2;
                     finalWindow->posW = overlayobj->mData.cropW * h2 / overlayobj->mData.cropH;
-                    if (finalWindow->posX == 0)
-                        finalWindow->posX = (w2 - finalWindow->posW) / 2;
+                    finalWindow->posX = (w2 - finalWindow->posW) / 2;
                 }
-                finalWindow->posH = finalWindow->posH / interlaceMultiplier;
 #else
-                finalWindow->posX = 0;
-                finalWindow->posY = 0;
                 overlay_ctrl_t   *data   = overlayobj->data();
                 if (data->rotation == 0) {
                     unsigned int aspect_ratio = 0;
@@ -475,68 +364,15 @@ void overlay_control_context_t::calculateWindow(overlay_object *overlayobj, over
                 }
                 else LOGD("Window settings not changed bcos Rotation != 0. Wouldnt rotation be zero when watching on TV???");
 #endif
-            LOGD("calculateWindow(): posW=%d, posH=%d, cropW=%d, cropH=%d",
-                finalWindow->posW, finalWindow->posH, overlayobj->mData.cropW, overlayobj->mData.cropH);
             }
             break;
         default:
             LOGE("Leave the default  values");
         };
-#if 0	// Tushar
-    /**
-    * check the final window scaling factors against H/W caps
-    * and adjust
-    * (1) Crop window keeping the Aspect ratio same--> For downscaling limit
-    * (2) Final Output Window --> For Upsclaing limit
-    * Before start checks, roundup the Window width & height to even integer
-    */
-    finalWindow->posH = finalWindow->posH - (finalWindow->posH % 2);
-    finalWindow->posW = finalWindow->posW - (finalWindow->posW % 2);
-    /* Handling the Downscaling scenario for Height */
-    if (overlayobj->mData.cropH > (finalWindow->posH * MAX_DSS_DOWNSCALING_FACTOR)) {
-        tempH = MAX(overlayobj->mData.cropH, 1); //this is to avoid cropH being zero scenario
-        overlayobj->mData.cropH = MAX_DSS_DOWNSCALING_FACTOR * finalWindow->posH;
-        //adjust the cropW for the new cropH, to maintain aspect ratio
-        overlayobj->mData.cropW = (overlayobj->mData.cropW * overlayobj->mData.cropH) / tempH;
-    } else if (finalWindow->posH > (overlayobj->mData.cropH * MAX_DSS_UPSCALING_FACTOR)) {
-        /* Handling the upscaling scenario for Height*/
-        tempH = MAX(finalWindow->posH, 1); //this is to avoid posH being zero scenario
-        finalWindow->posH = MAX_DSS_UPSCALING_FACTOR * overlayobj->mData.cropH;
-        //adjust the window width to maintain aspect ratio
-        finalWindow->posW = (finalWindow->posW * finalWindow->posH ) / tempH;
-    }
-
-    /* Handling the Downscaling scenario for Width*/
-    if (overlayobj->mData.cropW > (finalWindow->posW * MAX_DSS_DOWNSCALING_FACTOR)) {
-        tempW = MAX(overlayobj->mData.cropW, 1); //this is to avoid cropW being zero scenario
-        overlayobj->mData.cropW = MAX_DSS_DOWNSCALING_FACTOR * finalWindow->posW;
-        //adjust the cropH for the new cropW, to maintain aspect ratio
-        overlayobj->mData.cropH = (overlayobj->mData.cropH * overlayobj->mData.cropW) / tempW;
-    } else if (finalWindow->posW > (overlayobj->mData.cropW * MAX_DSS_UPSCALING_FACTOR)) {
-        /* Handling the upscaling scenario for width */
-        tempW = MAX(finalWindow->posW, 1); //this is to avoid posW being zero scenario
-        finalWindow->posW = MAX_DSS_UPSCALING_FACTOR * overlayobj->mData.cropW;
-        //adjust the window height to maintain aspect ratio
-        finalWindow->posH = (finalWindow->posH * finalWindow->posW ) / tempW;
-    }
-
-    if (isCtrlpath) {
-        fd = overlayobj->getctrl_videofd();
-    } else {
-        fd = overlayobj->getdata_videofd();
-    }
-
-    if (v4l2_overlay_set_crop(fd, overlayobj->mData.cropX, overlayobj->mData.cropY,\
-                              overlayobj->mData.cropW, overlayobj->mData.cropH)) {
-        LOGE("Failed defaulting crop window\n");
-        return;
-    }
-#endif
-    LOG_FUNCTION_NAME_EXIT
-
+        LOG_FUNCTION_NAME_EXIT
 }
 
-void overlay_control_context_t::calculateDisplayMetaData(overlay_object *overlayobj, int panelId)
+void overlay_control_context_t::calculateDisplayMetaData(overlay_object *overlayobj)
 {
     LOG_FUNCTION_NAME_ENTRY
     const char* paneltobeDisabled = NULL;
@@ -544,7 +380,7 @@ void overlay_control_context_t::calculateDisplayMetaData(overlay_object *overlay
     static const char* managername = "lcd";
     overlay_ctrl_t   *stage  = overlayobj->staging();
 
-    switch(panelId){
+    switch(stage->panel){
         case OVERLAY_ON_PRIMARY: {
             LOGD("REQUEST FOR LCD1");
             panelname = "lcd";
@@ -553,7 +389,7 @@ void overlay_control_context_t::calculateDisplayMetaData(overlay_object *overlay
         break;
         case OVERLAY_ON_SECONDARY: {
             LOGD("REQUEST FOR LCD2");
-            panelname = "lcd2";
+            panelname = "2lcd";
             managername ="2lcd";
             paneltobeDisabled = "pico_DLP";
         }
@@ -568,7 +404,7 @@ void overlay_control_context_t::calculateDisplayMetaData(overlay_object *overlay
             LOGD("REQUEST FOR PICO DLP");
             panelname = "pico_DLP";
             managername = "2lcd";
-            paneltobeDisabled = "lcd2";
+            paneltobeDisabled = "2lcd";
         }
         break;
         case OVERLAY_ON_VIRTUAL_SINK:
@@ -644,26 +480,17 @@ int overlay_data_context_t::enable_streaming_locked(overlay_object* overlayobj, 
         return -1;
     }
     overlayobj->streamEn = 1;
-    int fd, linkfd;
+    int fd;
     if (isDatapath) {
         fd = overlayobj->getdata_videofd();
-        linkfd = overlayobj->getdata_linkvideofd();
     }
     else {
         fd = overlayobj->getctrl_videofd();
-        linkfd = overlayobj->getctrl_linkvideofd();
     }
     rc = v4l2_overlay_stream_on(fd);
     if (rc) {
         LOGE("Stream Enable Failed!/%d\n", rc);
         overlayobj->streamEn = 0;
-    }
-    if (linkfd > 0) {
-        rc = v4l2_overlay_stream_on(linkfd);
-        if (rc) {
-            LOGE("link device Stream Enable Failed!/%d\n", rc);
-            overlayobj->streamEn = 0;
-        }
     }
     LOG_FUNCTION_NAME_EXIT
     return rc;
@@ -697,21 +524,13 @@ int overlay_data_context_t::disable_streaming_locked(overlay_object* overlayobj,
 
     if (overlayobj->streamEn) {
         int fd;
-        int linkfd;
-
         if (isDatapath) {
             fd = overlayobj->getdata_videofd();
-            linkfd = overlayobj->getdata_linkvideofd();
         }
         else {
             fd = overlayobj->getctrl_videofd();
-            linkfd = overlayobj->getctrl_linkvideofd();
         }
         ret = v4l2_overlay_stream_off( fd );
-        if (linkfd > 0 ) {
-            v4l2_overlay_stream_off( linkfd );
-        }
-
         if (ret) {
             LOGE("Stream Off Failed!/%d\n", ret);
         } else {
@@ -761,9 +580,16 @@ int overlay_control_context_t::overlay_get(struct overlay_control_device_t *dev,
 }
 
 overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_control_device_t *dev,
-                                        uint32_t w, uint32_t h, int32_t  format, int isS3D)
+                                        uint32_t w, uint32_t h, int32_t  format)
 {
-    LOGD("overlay_createOverlay:IN w=%d h=%d format=%d isS3D=%d \n", w, h, format, isS3D);
+    LOGV("For Non-3D case\n");
+    return overlay_createOverlay(dev, w, h, format, 0);
+}
+
+overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_control_device_t *dev,
+                                        uint32_t w, uint32_t h, int32_t  format,int isS3D)
+{
+    LOGD("overlay_createOverlay:IN w=%d h=%d format=%d\n", w, h, format);
     LOG_FUNCTION_NAME_ENTRY;
 
     overlay_object            *overlayobj;
@@ -773,7 +599,7 @@ overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_contr
     uint32_t num = NUM_OVERLAY_BUFFERS_REQUESTED;
     int fd;
     int overlay_fd;
-    int pipelineId = -1;
+    int pipelineId = 0;
     int index = 0;
     /* Validate the width and height are within a valid range for the
     * video driver.
@@ -797,97 +623,34 @@ overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_contr
 
     int overlayid = -1;
 
-#ifdef CHRIS_SDC_WAA
-	//NOTE : do we need mutex protection here??
-	//may not be needed here, because Overlay creation happens only from Surface flinger context
-	int i;
-	for (i = 0; i < MAX_NUM_OVERLAYS; i++) {
-		if (self->mOmapOverlays[i] == NULL) {
-			overlayid = i;
-
-			LOGD("Enabling the OVERLAY[%d]", overlayid);
-			fd = v4l2_overlay_open(overlayid);
-			if (fd < 0) {
-				LOGE("Failed to open overlay device[%d] fd=%d, errno=%d\n", overlayid, fd, errno);
-				// If errno is EBUSY, overlay driver is used by a player and control context is destroyed
-				// Therefore we should use next available overlay
-				if(errno == EBUSY)
-					continue;
-				else
-					return NULL;
-			}
-			break;
-		}
-	}
-
-	if ((i == MAX_NUM_OVERLAYS) || (overlayid < 0)) {
-		LOGE("No free overlay available");
-		return NULL;
-	}
-
-/* LGE_CHANGE_S, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-#ifdef OVERLAY_COMPETE_WORKAROUND
-	/* If current overlay ID is different with previous ID
-	    AND previous overlay was not destroyed,
-	    At this scope camera preview display is always in disorder.
-	    So, wait for destroying completed */
-	current_overlay.id = overlayid;
-	current_overlay.opened = true;
-
-	LOGE("Current Overlay id:%d opened:%d before id:%d opened:%d",
-	    current_overlay.id, current_overlay.opened,
-	    before_overlay.id, before_overlay.opened);
-
-	if (!first_run) {
-	    if (current_overlay.id != before_overlay.id &&
-		(current_overlay.opened == true && before_overlay.opened == true)) {
-		    LOGE("Overlay competeing occurred! Please wait for Survive!!!");
-		    gettimeofday(&now, NULL);
-		    timeout.tv_sec = now.tv_sec + 5;
-		    timeout.tv_nsec = now.tv_usec * 1000;
-
-		    ret = pthread_cond_timedwait(&destroy_cond, &request_lock, &timeout);
-		    LOGE("Wait competing result: %d !!!", ret);
-		    /* TODO workaround for ret = ETIMEOUT(-110) */
-	    }
-	}
-	first_run = 0;
-#endif //OVERLAY_COMPETE_WORKAROUND
-/* LGE_CHANGE_E, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-
-#else
     //NOTE : do we need mutex protection here??
     //may not be needed here, because Overlay creation happens only from Surface flinger context
-    for (int i = 0; i < MAX_NUM_OVERLAYS; i++) {
-        if (self->mOmapOverlays[i] == NULL) {
-            overlayid = i;
-            break;
+    
+    // TI PATCH OMAPS00228762 START
+	// Restrict to use Video 2 pipeline and wait untill vid 1 released.
+    for (int i = 0; i < MAX_NUM_OVL_TRY; i++) {
+        if (self->mOmapOverlays[0] != NULL) {
+        LOGE("Overlay is busy for the %d time \n", i+1);	
+            sleep(1);
+        }
+        else {
+        	overlayid = 0;
+        	break;
         }
     }
-
+	// TI PATCH OMAPS00228762 END
+	
     if (overlayid < 0) {
         LOGE("No free overlay available");
         return NULL;
     }
 
-#ifdef TARGET_OMAP4
-    if (isS3D)
-    {
-        LOGD("Enabling the OVERLAY[0] for S3D \n");
-        fd = v4l2_overlay_open(-1);
-    }
-    else
-#endif
-    {
-        LOGD("Enabling the OVERLAY[%d]", overlayid);
-        fd = v4l2_overlay_open(overlayid);
-    }
-
+    LOGD("Enabling the OVERLAY[%d]", overlayid);
+    fd = v4l2_overlay_open(overlayid);
     if (fd < 0) {
         LOGE("Failed to open overlay device[%d]\n", overlayid);
         return NULL;
     }
-#endif
 
     overlay_fd = self->create_shared_overlayobj(&overlayobj);
     if ((overlay_fd < 0) || (overlayobj == NULL)) {
@@ -906,70 +669,95 @@ overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_contr
         goto error1;
     }
 
-    if (v4l2_overlay_set_rotation(fd, 0, 0, 0)) {
+
+if (v4l2_overlay_set_rotation(fd, 90, 0)) {
+        LOGE("Failed defaulting rotation\n");
+        goto error1;
+}
+
+#ifndef KERNEL_35_WA
+/*
+    if (v4l2_overlay_set_rotation(fd, 90, 0)) {
         LOGE("Failed defaulting rotation\n");
         goto error1;
     }
+*/
 
     if (v4l2_overlay_getId(fd, &pipelineId)) {
         LOGE("Failed: getting overlay Id");
         goto error1;
     }
-
-    if ((pipelineId >= 0) && (pipelineId <= MAX_NUM_OVERLAYS)) {
-        sprintf(overlayobj->overlaymanagerpath, "/sys/devices/platform/omapdss/overlay%d/manager", pipelineId);
-        sprintf(overlayobj->overlayenabled, "/sys/devices/platform/omapdss/overlay%d/enabled", pipelineId);
+#else
+    pipelineId = overlayid + 2; //offset 2, because of 2 fbs in the system
+#endif
+// TI PATCH OMAPS00228762 START	
+#if 0 // Not Required
+    if ((pipelineId < 0) || (pipelineId > MAX_NUM_OVERLAYS)) {
+        LOGE("Failed: Invalid overlay Id");
+        goto error1;
     }
-    //lets reset the manager to the lcd to start with
-    if (!isS3D) {
-      if (sysfile_write(overlayobj->overlaymanagerpath, "lcd", sizeof("lcd")) < 0) {
-            LOGE("Overlay Manager set failed, but proceed anyway");
+#endif
+ // TI PATCH OMAPS00228762 END
+    sprintf(overlayobj->overlaymanagerpath, "/sys/devices/platform/omapdss/overlay%d/manager", pipelineId);
+    sprintf(overlayobj->overlayzorderpath, "/sys/devices/platform/omapdss/overlay%d/zorder", pipelineId);
+    sprintf(overlayobj->overlayenabled, "/sys/devices/platform/omapdss/overlay%d/enabled", pipelineId);
+
+#ifndef TARGET_OMAP4
+    if (v4l2_overlay_set_local_alpha(fd, 1)){
+	
+        LOGE("Failed enabling Local Alpha\n");
+        goto error1;
+    }
+#else
+    if (v4l2_overlay_set_global_alpha(fd, 1, 1)){
+        LOGE("Failed enabling alpha\n");
+        goto error1;
+    }
+
+
+    /* Enable the video zorder and video transparency
+    * for the controls to be visible on top of video, give the graphics highest zOrder
+    * and set the video source as the tranparency key type
+    * set black as the transparency key value
+    * and enable the trasparency feature
+    **/
+    /** in order to findout which manager to set, check for the name
+    * and set the properties for that lcd manager
+    */
+    for (int i = 0; i < MAX_MANAGER_CNT; i++) {
+        if (strcmp(managerMetaData[i].managername, "lcd") == 0) {
+            LOGD("found LCD manager @ [%d]", i);
+            index = i;
+            break;
         }
     }
 
-#ifndef TARGET_OMAP4
-    if (v4l2_overlay_set_colorkey(fd, 0, 0, 0)){
-        LOGE("Failed enabling color key\n");
+    if (sysfile_write("sys/devices/platform/omapdss/overlay0/zorder", "3",  strlen("0")) < 0) {
+        goto error1;
+    }
+
+    if (sysfile_write("sys/devices/platform/omapdss/overlay1/zorder", "0",  strlen("0")) < 0) {
+        goto error1;
+    }
+
+    if (sysfile_write(overlayobj->overlayzorderpath, "1",  strlen("0")) < 0) {
+        goto error1;
+    }
+
+    if (sysfile_write(managerMetaData[index].managertrans_key_value, "0", strlen("0")) < 0) {
+        goto error1;
+    }
+
+    if (sysfile_write(managerMetaData[index].managertrans_key_type, "video-source", strlen("video-source")) < 0) {
+        goto error1;
+    }
+
+    if (sysfile_write(managerMetaData[index].managertrans_key_enabled, "1", strlen("1")) < 0) {
         goto error1;
     }
 #endif
 
-    /* Enable the video zorder and video transparency
-     * for the controls to be visible on top of video, give the graphics highest zOrder
-     **/
-     if (!isS3D) {
-         /* Omap has 3 video pipelines whose zOrders are 0,1,and 2.
-          * The graphics overlay is special with reserved zOrder of 3.
-          * Graphics calls are not coming to this module.
-          * Overlay with higher zOrder is displayed on top of the one
-          * with lower zOrder. Two overlays assigned to the same
-          * zOrder will result in distortions on the video output.
-          * An available zOrder is assigned to this overlay.
-          **/
-         int maxZorder = -1;
-         for (int i=0; i < MAX_NUM_OVERLAYS; i++) {
-             if (self->mOmapOverlays[i] != NULL) {
-                 LOGD("mZorderUsage[%d] = %d is occupied", i, self->mZorderUsage[i]);
-                 if (self->mZorderUsage[i] > maxZorder) {
-                     maxZorder = self->mZorderUsage[i];
-                 }
-             }
-         }
- 
-         if (maxZorder == MAX_NUM_OVERLAYS -1) {
-             LOGD("No zOrder is available\n");
-             goto error1;
-         }
- 
-         self->mZorderUsage[overlayid] = maxZorder+1;
-         if (v4l2_overlay_set_zorder(fd, maxZorder+1)) {
-             LOGE("Failed setting zorder\n");
-             goto error1;
-         }
-         LOGD("mZorderUsage[%d] is assigned to %d", overlayid, self->mZorderUsage[overlayid]);
-     }
-
-    if (v4l2_overlay_req_buf(fd, &num, 0, 0, EMEMORY_MMAP)) {
+    if (v4l2_overlay_req_buf(fd, &num, 0, 0)) {
         LOGE("Failed requesting buffers\n");
         goto error1;
     }
@@ -985,24 +773,12 @@ overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_contr
     overlayobj->mData.cropW = w;
     overlayobj->mData.cropH = h;
 
-    overlayobj->mData.s3d_active = isS3D;
-    overlayobj->mData.s3d_mode = OVERLAY_S3D_MODE_ON;
-    overlayobj->mData.s3d_fmt = OVERLAY_S3D_FORMAT_NONE;
-    overlayobj->mData.s3d_order = OVERLAY_S3D_ORDER_LF;
-    overlayobj->mData.s3d_subsampling = OVERLAY_S3D_SS_NONE;
+    // workaround for camera
+    overlayobj->IsCamera = 0;
 
     self->mOmapOverlays[overlayid] = overlayobj;
 
     LOGD("overlay_createOverlay: OUT");
-
-/* LGE_CHANGE_S, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-#ifdef OVERLAY_COMPETE_WORKAROUND
-    before_overlay.id = current_overlay.id;
-    before_overlay.opened = true;
-    current_overlay.opened = false;
-#endif
-/* LGE_CHANGE_E, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-
     return overlayobj;
 
     LOG_FUNCTION_NAME_EXIT;
@@ -1010,80 +786,6 @@ error1:
     close(fd);
     self->destroy_shared_overlayobj(overlayobj);
     return NULL;
-}
-
-overlay_t* overlay_control_context_t::overlay_createOverlay(struct overlay_control_device_t *dev,
-                                        uint32_t w, uint32_t h, int32_t  format)
-{
-    LOGV("For Non-3D case\n");
-    return overlay_createOverlay(dev, w, h, format, 0);
-}
-
-int overlay_control_context_t::overlay_requestOverlayClone(struct overlay_control_device_t* dev,
-                                                           overlay_t* overlay,int enable)
-{
-    overlay_control_context_t *self = (overlay_control_context_t *)dev;
-    overlay_object *overlayobj = static_cast<overlay_object *>(overlay);
-    LOGD("TIOVerlay: req Clone[%d]", enable);
-
-    int overlayid = -1;
-    int linkfd = -1;
-    if (!enable) {
-        linkfd = overlayobj->getctrl_linkvideofd();
-        if (linkfd > 0) {
-            overlayobj->setctrl_linkvideofd(-1);
-            close(linkfd);
-            return -1;
-        }
-    }
-
-    //NOTE : do we need mutex protection here??
-    //may not be needed here, because Overlay creation happens only from Surface flinger context
-    for (int i = 0; i < MAX_NUM_OVERLAYS; i++) {
-        if (self->mOmapOverlays[i] == NULL) {
-            overlayid = i;
-            break;
-        }
-    }
-
-    if (overlayid < 0) {
-        LOGE("No free overlay available");
-        return -1;
-    }
-
-    linkfd = v4l2_overlay_open(overlayid);
-    if (linkfd < 0) {
-        LOGE("Failed to open overlay linked device\n");
-        return -1;
-    }
-
-    if (v4l2_overlay_init(linkfd, overlayobj->w, overlayobj->h, overlayobj->format)) {
-        LOGE("Failed initializing overlays\n");
-        goto error1;
-    }
-
-    if (v4l2_overlay_set_rotation(linkfd, 0, 0, 0)) {
-        LOGE("Failed defaulting rotation\n");
-        goto error1;
-    }
-
-    if (v4l2_overlay_set_crop(linkfd, 0, 0, overlayobj->w, overlayobj->h)) {
-        LOGE("Failed defaulting crop window\n");
-        goto error1;
-    }
-
-    if (v4l2_overlay_req_buf(linkfd, (uint32_t*)&overlayobj->num_buffers, 0, 0, EMEMORY_USRPTR)) {
-        LOGE("Error creating linked buffers1");
-        goto error1;
-    }
-
-    overlayobj->setctrl_linkvideofd(linkfd);
-    LOGD("link_fd = %d", linkfd);
-    return (linkfd);
-
-error1:
-    close(linkfd);
-    return -1;
 }
 
 void overlay_control_context_t::overlay_destroyOverlay(struct overlay_control_device_t *dev,
@@ -1101,60 +803,27 @@ void overlay_control_context_t::overlay_destroyOverlay(struct overlay_control_de
 
     int rc;
     int fd = overlayobj->getctrl_videofd();
-    int linkfd = overlayobj->getctrl_linkvideofd();
     int index = overlayobj->getIndex();
 
     overlay_data_context_t::disable_streaming(overlayobj, false);
 
+    //lets reset the manager to the lcd
+    if (sysfile_write(overlayobj->overlaymanagerpath, "lcd", sizeof("lcd")) < 0) {
+        LOGE("Overlay Manager reset failed, but proceed anyway");
+    }
     LOGI("Destroying overlay/fd=%d/obj=%08lx", fd, (unsigned long)overlay);
 
     if (close(fd)) {
         LOGI( "Error closing overly fd/%d\n", errno);
     }
 
-    if (linkfd > 0 ) {
-        if (close(linkfd)) {
-            LOGI( "Error closing link fd/%d\n", errno);
-        }
-    }
+    // workaround for camera
+    overlayobj->IsCamera = 0;
 
     self->destroy_shared_overlayobj(overlayobj);
 
     //NOTE : needs no protection, as the calls are already serialized at Surfaceflinger level
     self->mOmapOverlays[index] = NULL;
-
-    /* When this overlay is destructed, its zOrder should be
-     * freed and all other overlays whose zOrder is higher
-     * than this overlay's zOrder should be lowered by 1 in order
-     * to make zOrder consectively occupied.
-     **/
- 
-    int targetedZorder = self->mZorderUsage[index];
-    LOGD("mZorderUsage[%d] = %d should be removed", index, targetedZorder);
- 
-    self->mZorderUsage[index] = -1;
-    for (int i=0; i < MAX_NUM_OVERLAYS; i++) {
-        if (self->mOmapOverlays[i] != NULL) {
-            if (self->mZorderUsage[i] > targetedZorder) {
-                LOGD("mZorderUsage[%d]=%d should be lowered by 1",i, self->mZorderUsage[i]);
-                self->mZorderUsage[i] -= 1;
-                overlay_object *overlayobj = static_cast<overlay_object *>(self->mOmapOverlays[i]);
-                int fd = overlayobj->getctrl_videofd();
- 
-                if (v4l2_overlay_set_zorder(fd, self->mZorderUsage[i])) {
-                    LOGE("Failed setting zorder\n");
-                    //There is nothing to do if failed
-                }
-            }
-        }
-    }
-
-/* LGE_CHANGE_S, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
-#ifdef OVERLAY_COMPETE_WORKAROUND
-    before_overlay.opened = false;
-    pthread_cond_signal(&destroy_cond);
-#endif
-/* LGE_CHANGE_E, hj.eum@lge.com, 2011-05-25. for preventing overlay crash */
 
     LOGD("overlay_destroyOverlay:OUT");
     LOG_FUNCTION_NAME_EXIT;
@@ -1170,10 +839,9 @@ int overlay_control_context_t::overlay_setPosition(struct overlay_control_device
     }
 
     overlay_object *overlayobj = static_cast<overlay_object *>(overlay);
-    overlay_ctrl_t   *data   = overlayobj->data();
+
     overlay_ctrl_t   *stage  = overlayobj->staging();
-    int fd = overlayobj->getctrl_videofd();
-    overlay_ctrl_t finalWindow;
+
     int rc = 0;
 
     // FIXME:  This is a hack to deal with seemingly unintentional negative
@@ -1186,10 +854,12 @@ int overlay_control_context_t::overlay_setPosition(struct overlay_control_device
     // the display.
 
     // Require a minimum size
-    if (w < 16 || h < 16) {
+    if (w < 3 || h < 3) {
         // Return an error
+//Change for OMAPS00229201
+        LOGE("WARN: Width or hieght is less than 3 \n ");
         rc = -1;
-        goto END;
+//Change for OMAPS00229201
     } else if (!overlayobj->controlReady) {
         if ( x < 0 ) x = 0;
         if ( y < 0 ) y = 0;
@@ -1201,25 +871,15 @@ int overlay_control_context_t::overlay_setPosition(struct overlay_control_device
                (y + h) > overlayobj->dispH) {
         // Return an error
         rc = -1;
-        goto END;
     }
-#if 0 // Tushar
-    if (data->posX == (unsigned int)x &&
-        data->posY == (unsigned int)y &&
-        data->posW == w &&
-        data->posH == h) {
-        LOGI("Nothing to do!\n");
-        goto END;
-    }
-#endif
-	if (rc == 0) {
+
+    if (rc == 0) {
         stage->posX = x;
         stage->posY = y;
         stage->posW = w;
         stage->posH = h;
-	}
+    }
 
-END:
     LOG_FUNCTION_NAME_EXIT;
     return rc;
 }
@@ -1245,12 +905,16 @@ int overlay_control_context_t::overlay_setParameter(struct overlay_control_devic
                                 overlay_t* overlay, int param, int value)
 {
     LOG_FUNCTION_NAME_ENTRY;
+    if (value < 0)
+        return -EINVAL;
 
     if ((dev == NULL) || (overlay == NULL)) {
         LOGE("Null Arguments / Overlay not initd");
         return -1;
     }
 
+
+LOGE("Prak: param=%d, value=%d\n", param, value);
     overlay_object *overlayobj = static_cast<overlay_object *>(overlay);
     overlay_ctrl_t *stage = static_cast<overlay_object *>(overlay)->staging();
     int rc = 0;
@@ -1263,41 +927,21 @@ int overlay_control_context_t::overlay_setParameter(struct overlay_control_devic
         switch ( value ) {
         case 0:
             stage->rotation = 0;
-            stage->mirror = false;
+            LOGE("Prak: Rotation to 0\n");
             break;
         case OVERLAY_TRANSFORM_ROT_90:
             stage->rotation = 90;
-            stage->mirror = false;
             break;
         case OVERLAY_TRANSFORM_ROT_180:
             stage->rotation = 180;
-            stage->mirror = false;
             break;
         case OVERLAY_TRANSFORM_ROT_270:
             stage->rotation = 270;
-            stage->mirror = false;
-            break;
-        case OVERLAY_TRANSFORM_FLIP_H:
-            stage->rotation = 0;
-            stage->mirror = false;
-            break;
-        case OVERLAY_TRANSFORM_FLIP_V:
-            stage->rotation = 180;
-            stage->mirror = false;
-            break;
-        case (HAL_TRANSFORM_FLIP_V | OVERLAY_TRANSFORM_ROT_90):
-            stage->rotation = 90;
-            stage->mirror = true;
-            break;
-        case (HAL_TRANSFORM_FLIP_H | OVERLAY_TRANSFORM_ROT_90):
-            stage->rotation = 270;
-            stage->mirror = true;
             break;
         default:
             rc = -EINVAL;
             break;
         }
-        LOGI("Tushar: Rotation = %d and Mirror = %d\n", stage->rotation, stage->mirror);
         break;
     case OVERLAY_COLOR_KEY:
         stage->colorkey = value;
@@ -1307,9 +951,9 @@ int overlay_control_context_t::overlay_setParameter(struct overlay_control_devic
         stage->alpha = MIN(value, 0xFF);
         break;
     case OVERLAY_PLANE_Z_ORDER:
-        //limit the max value of z-order to hw limit i.e.3 and gfx and vid1 are 3 & 2 respectively
-        //make sure that video is behind graphics so it to either 0 or 1
-        stage->zorder = MIN(value, 1);
+        //limit the max value of z-order to hw limit i.e.3
+        //make sure that video is behind graphics so it to only 2
+        stage->zorder = MIN(value, 2);
         break;
     case OVERLAY_SET_DISPLAY_WIDTH:
         overlayobj->dispW = value;
@@ -1322,13 +966,11 @@ int overlay_control_context_t::overlay_setParameter(struct overlay_control_devic
             value = OVERLAY_ON_PRIMARY;
         }
         stage->panel = value;
-        LOGD("overlay_setParameter(): OVERLAY_SET_SCREEN_ID : stage->panel=%d",stage->panel);
         break;
     default:
         rc = -1;
 
     }
-
     LOG_FUNCTION_NAME_EXIT;
     return rc;
 }
@@ -1352,29 +994,30 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
     overlay_ctrl_t   *data   = overlayobj->data();
     overlay_ctrl_t   *stage  = overlayobj->staging();
 
+    // workaround for camera
+    if (overlayobj->IsCamera == 1 && stage->rotation != 90)
+    {
+    	LOGE("Ignore overlay_commit because of workaround for camera");
+    	return -1;	
+    }
+
     int ret = 0;
     overlay_ctrl_t finalWindow;
     char overlaymanagername[PATH_MAX];
     int strmatch;
     int fd = overlayobj->getctrl_videofd();
     overlay_data_t eCropData;
-    int rotation_degree = stage->rotation;
-    int transparency_type = EVIDEO_SOURCE;
-    int videopipezorder = stage->zorder;
-    int transkey = stage->colorkey;
 
-#ifndef TARGET_OMAP4
     /** NOTE: In order to support HDMI without app explicitly requesting for
-    * the screen ID, this is the alternative path check for the overlay manager.
-    * (here assumption is : overlay manager is set from command line
-    * prior to playing the media clip.)
+    * the screen ID, this is the alternative path
+    * check for the overlay manager (here assumption is that: overlay manager
+    * is set from command line prior to playing the media clip
     */
     if (sysfile_read(overlayobj->overlaymanagerpath, &overlaymanagername, PATH_MAX) < 0) {
         LOGE("Overlay manager Name Get failed [%d]", __LINE__);
         return -1;
     }
     strtok(overlaymanagername, "\n");
-#endif
 
     pthread_mutex_lock(&overlayobj->lock);
 
@@ -1383,58 +1026,31 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
     if (data->posX == stage->posX && data->posY == stage->posY &&
         data->posW == stage->posW && data->posH == stage->posH &&
         data->rotation == stage->rotation &&
+        data->colorkey == stage->colorkey &&
 #ifdef TARGET_OMAP4
         data->alpha == stage->alpha &&
-        data->mirror == stage->mirror &&
 #endif
         data->panel == stage->panel) {
-        LOGI("Nothing to do! ==> data->rotation == stage->rotation\n");
+        LOGI("Nothing to do!\n");
         goto end;
     }
 
-/*LGE_CHANGE[fefe7270.park@lge.com] we don't use follow code anymore by request of TI*/
-#if 1 // Tushar - omaps00241525 /* 20110503 dongyu.gwak@lge.com Recover the code since overlay rotation problem when exit Camera func.  */
-    /* If Rotation has changed but window has not changed yet, ignore this commit.
-        SurfaceFlinger will set the right window parameters and call commit again. */
-
-    if ((data->rotation != stage->rotation) &&		
-		/* LGE_CHANGE [jaedo.jin@lge.com] 2011-7-27, added condition for using 90 degree rotation only */
-    	(abs(data->rotation - stage->rotation)!= 180) &&
-        (data->posX == stage->posX) &&
-        (data->posY == stage->posY) &&
-        (data->posW == stage->posW) &&
-        (data->posH == stage->posH))
-    {
-        //LOGI("Nothing to do ==> data->rotation != stage->rotation");
-        LOGI("Nothing to do ==> data->rotation = %d != stage->rotation = %d", data->rotation, stage->rotation);
-        goto end;
-    }
-#endif
     data->posX       = stage->posX;
     data->posY       = stage->posY;
     data->posW       = stage->posW;
     data->posH       = stage->posH;
     data->rotation   = stage->rotation;
-    data->alpha      = stage->alpha;
     data->colorkey   = stage->colorkey;
-    data->zorder     = stage->zorder;
-    data->mirror     = stage->mirror;
+    data->alpha      = stage->alpha;
 
-	    // Adjust the coordinate system to match the V4L change
+
+    // Adjust the coordinate system to match the V4L change
     switch ( data->rotation ) {
     case 90:
-	/* START, ryan-yoon */ 
-	#if 0 //This calculation is only setted the video-frames at the center of screen.
         finalWindow.posX = data->posY;
-        finalWindow.posY = data->posX;
+        finalWindow.posY = overlayobj->dispW - data->posW - data->posX;
         finalWindow.posW = data->posH;
         finalWindow.posH = data->posW;
-	#else //This calculation is setted the video-frames at appointed position by user on screen.
-	finalWindow.posX = data->posY;
-        finalWindow.posY = (overlayobj->dispW - (data->posW + data->posX));
-        finalWindow.posW = data->posH;
-        finalWindow.posH = data->posW;
-    	#endif /* END, ryan-yoon */
         break;
     case 180:
         finalWindow.posX = ((overlayobj->dispW - data->posX) - data->posW);
@@ -1443,123 +1059,63 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
         finalWindow.posH = data->posH;
         break;
     case 270:
-	/* START, ryan-yoon */ 
-	#if 0 // Tushar - omaps00241525 //This calculation is only setted the video-frames at the center of screen.
         finalWindow.posX = data->posY;
         finalWindow.posY = data->posX;
         finalWindow.posW = data->posH;
         finalWindow.posH = data->posW;
-	#else //This calculation is setted the video-frames at appointed position by user on screen.
-	      // Tushar - omaps00241525 - [
-	      //finalWindow.posX = data->posY;
-        //finalWindow.posY = (overlayobj->dispW - (data->posW + data->posX));
-        finalWindow.posX = (overlayobj->dispH - (data->posH + data->posY));
-        finalWindow.posY = data->posX;
-        // Tushar - omaps00241525 - ]
-        finalWindow.posW = data->posH;
-        finalWindow.posH = data->posW;
-    #endif /* END, ryan-yoon */
         break;
     default: // 0
         finalWindow.posX = data->posX;
         finalWindow.posY = data->posY;
-#if 0 // Tushar // chris-sdc
-		// If HDMI is connected, width/height of finalWindow should be 720p, 1280x720.
-		// In other case, default resolution, 800x480, should be set.
-		{
-			char managerDisplayPath[PATH_MAX] = "/sys/devices/platform/omapdss/manager0/display";
-			char displayName[PATH_MAX]={0};
-			int retVal = 0;
-
-			retVal = sysfile_read(managerDisplayPath, &displayName, PATH_MAX);
-			strtok(displayName, "\n");
-			
-			if(retVal < 0)
-			{
-				// 20101210 seunghwan.yoo@lge.com B-prj MMS video layout fix
-				finalWindow.posW = data->posW;
-				finalWindow.posH = data->posH;
-			}
-			else
-			{
-				if(!strcmp(displayName, "hdmi"))
-				{
-		finalWindow.posW = HDMI_WIDTH;
-		finalWindow.posH = HDMI_HEIGHT;
-				}
-				else
-				{
-					finalWindow.posW = data->posW;
-					finalWindow.posH = data->posH;
-				}
-			}
-		}
-#else // orig
-		finalWindow.posW = data->posW;
+        finalWindow.posW = data->posW;
         finalWindow.posH = data->posH;
-#endif
         break;
     }
 
-#ifndef TARGET_OMAP4
-    /** NOTE: In order to support HDMI without app explicitly requesting for
-    * the screen ID, this is the alternative path check for the overlay manager.
-    * (here assumption is : overlay manager is set from command line
-    * prior to playing the media clip.)
-    */
     strmatch = strcmp(overlaymanagername, "tv");
     if (!strmatch) {
         stage->panel = OVERLAY_ON_TV;
     }
-#endif
-    calculateDisplayMetaData(overlayobj, stage->panel); // Tushar - new in GB
-    
+
     //Calculate window size. As of now this is applicable only for non-LCD panels
-    calculateWindow(overlayobj, &finalWindow, stage->panel);
+    calculateWindow(overlayobj, &finalWindow);
 
     LOGI("Position/X%d/Y%d/W%d/H%d\n", data->posX, data->posY, data->posW, data->posH );
     LOGI("Adjusted Position/X%d/Y%d/W%d/H%d\n", finalWindow.posX, finalWindow.posY, finalWindow.posW, finalWindow.posH);
     LOGI("Rotation/%d\n", data->rotation );
+    LOGI("ColorKey/%d\n",data->colorkey );
     LOGI("alpha/%d\n", data->alpha );
     LOGI("zorder/%d\n", data->zorder );
-    LOGI("data->panel/0x%x/stage->panel/0x%x\n", data->panel, stage->panel );    
+    LOGI("data->panel/0x%x/stage->panel/0x%x\n", data->panel, stage->panel );
 
-    if ((ret = v4l2_overlay_get_crop(fd, &eCropData.cropX, &eCropData.cropY, &eCropData.cropW, &eCropData.cropH))) {
+    /*if ((ret = v4l2_overlay_get_crop(fd, &eCropData.cropX, &eCropData.cropY, &eCropData.cropW, &eCropData.cropH))) {
         LOGE("commit:Get crop value Failed!/%d\n", ret);
         goto end;
-    }
-    // Disable streaming to ensure that stream_on is called again which indirectly sets overlayenabled to 1
+    }*/
+
     if ((ret = overlay_data_context_t::disable_streaming_locked(overlayobj, false))) {
         LOGE("Stream Off Failed!/%d\n", ret);
         goto end;
     }
-
-    if (stage->panel == OVERLAY_ON_TV) {
-        /** 90 and 270 degree rotation is not applicable for TV
-        * hence reset the rotation to 0 deg if the panel is TV
-        * 180 degree rotation is required to handle mirroring scenario
-        */
-        if (data->rotation != 180) {
-            rotation_degree = 0;
-        }
-        transparency_type = EGRAPHICS_DESTINATION;
-        videopipezorder = 1;
-        transkey = 0;
-    }
-
-    LOGI("Set rotation degree in commit = %d\n", rotation_degree);
-    
-    if ((ret = v4l2_overlay_set_rotation(fd, rotation_degree, 0, data->mirror))) {
+#ifndef KERNEL_35_WA
+    if ((ret = v4l2_overlay_set_rotation(fd, data->rotation, 0))) {
         LOGE("Set Rotation Failed!/%d\n", ret);
         goto end;
     }
-
-
-    if ((ret = v4l2_overlay_set_crop(fd,
+#endif
+    /*if ((ret = v4l2_overlay_set_crop(fd,
                     eCropData.cropX,
                     eCropData.cropY,
                     eCropData.cropW,
                     eCropData.cropH))) {
+        LOGE("Set Cropping Failed!/%d\n",ret);
+        goto end;
+    }*/
+    if ((ret = v4l2_overlay_set_crop(fd,
+                    0,
+                    0,
+                    overlayobj->mData.cropW,
+                    overlayobj->mData.cropH))) {
         LOGE("Set Cropping Failed!/%d\n",ret);
         goto end;
     }
@@ -1573,258 +1129,99 @@ int overlay_control_context_t::overlay_commit(struct overlay_control_device_t *d
     //otherwise it may hang
     pthread_mutex_unlock(&overlayobj->lock);
 
-#ifdef TARGET_OMAP4
-    if (transkey < 0) {
-        if ((ret = v4l2_overlay_set_colorkey(fd, 0, 0x00, 0x00))) {
-            LOGE("Failed enabling color key\n");
-            goto end;
-        }
-    }
-    else {
-        if ((ret = v4l2_overlay_set_colorkey(fd, 1, transkey, transparency_type))) {
-            LOGE("Failed enabling color key\n");
-            goto end;
-        }
-    }
-#else
-    if ((ret = v4l2_overlay_set_colorkey(fd, 0, 0x00, 0x00))) {
-        LOGE("Failed enabling color key\n");
+#ifndef TARGET_OMAP4
+    if (v4l2_overlay_set_local_alpha(fd, 1)){
+	
+        LOGE("Failed enabling Local Alpha\n");
         goto end;
     }
-#endif
-
-    //Currently not supported with V4L2_S3D driver
-    if (!overlayobj->mData.s3d_active) {
+#else
+    if ((ret = v4l2_overlay_set_global_alpha(fd, 1, 255))) {
+        LOGE("Failed enabling alpha\n");
+        goto end;
+    }
+    if (data->zorder != stage->zorder) {
+        data->zorder = stage->zorder;
         //Set up the z-order for the overlay:
         //TBD:Surface flinger or the driver has to re-work the zorder of all the
         //other active overlays for a given manager to service the current request.
-        if ((ret = v4l2_overlay_set_zorder(fd, videopipezorder))) {
-             LOGE("Failed setting zorder\n");
-             goto end;
-
+        char z_order[16];
+        sprintf(z_order, "%d", data->zorder);
+        if (sysfile_write(overlayobj->overlayzorderpath, &z_order,  strlen("0")) < 0) {
+            LOGE("zorder setting failed");
+            return -1;
         }
     }
+#endif
 
-    if (overlayobj->getctrl_linkvideofd() > 0) {
-        CommitLinkDevice(dev, overlayobj);
-    }
-	
-	if (data->panel != stage->panel) {
-        LOGD("data->panel/0x%x / stage->panel/0x%x\n", data->panel, stage->panel );
+    if (data->panel != stage->panel) {
         data->panel = stage->panel;
-
+        calculateDisplayMetaData(overlayobj);
         LOGD("Panel path [%s]", screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displayenabled);
         LOGD("Manager display [%s]", managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managerdisplay);
-        LOGD("Manager path [%s]", overlayobj->overlaymanagerpath);
-        LOGD("Manager name [%s]", managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername);
-        LOGD("Display name [%s]", screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displayname);
+        LOGD("manager path [%s]", overlayobj->overlaymanagerpath);
+        LOGD("manager name [%s]", managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername);
+
         if (overlayobj->mDisplayMetaData.mTobeDisabledPanelIndex != -1) {
             char disablepanelpath[PATH_MAX];
             sprintf(disablepanelpath, "/sys/devices/platform/omapdss/display%d/enabled", \
                 overlayobj->mDisplayMetaData.mTobeDisabledPanelIndex);
             if (sysfile_write(disablepanelpath, "0", sizeof("0")) < 0) {
                 LOGE("panel disable failed");
-                ret = -1;
-                goto end;
+                return -1;
             }
         }
+        if (sysfile_write(overlayobj->overlayenabled, "0", sizeof("0")) < 0) {
+            LOGE("Failed: overlay Disable");
+            return -1;
+        }
 
-        if (!overlayobj->mData.s3d_active) {
-            if (sysfile_write(overlayobj->overlayenabled, "0", sizeof("0")) < 0) {
-                LOGE("Failed: overlay Disable");
-                ret = -1;
-                goto end;
-            }
-
-            /* Set the manager to the overlay */
-            if (sysfile_read(overlayobj->overlaymanagerpath, &overlaymanagername, PATH_MAX) < 0) {
-                LOGE("Overlay manager Name Get failed [%d]", __LINE__);
-                ret = -1;
-                goto end;
-            }
-            strtok(overlaymanagername, "\n");
-            LOGI("Before assigning Overlay-Manager to Overlay");
-            LOGI("overlaymanagerpath= %s, overlaymanagername= %s",overlayobj->overlaymanagerpath,overlaymanagername);
-
-            /**
-             * Before setting the manager, reset the overlay window to the default
-             * this is to support the panels of various timings. The Actual window
-             * is set after manager is set.
-             * Assumption# The lowest resolution panel is QQVGA
-             */
-            if ((ret = v4l2_overlay_set_position(fd, 0, 0, QQVGA_WIDTH, QQVGA_HEIGHT))) {
-                LOGE("Set Position Failed!/%d\n", ret);
-                goto end;
-            }
-
-            if (sysfile_write(overlayobj->overlaymanagerpath, \
-                managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername, PATH_MAX) < 0) {
-                LOGE("Unable to set the overlay->manager");
-                ret = -1;
-                goto end;
-            }
-
-            if (sysfile_read(overlayobj->overlaymanagerpath, &overlaymanagername, PATH_MAX) < 0) {
-                LOGE("Overlay manager Name Get failed [%d]", __LINE__);
-                ret = -1;
-                goto end;
-            }
-            strtok(overlaymanagername, "\n");
-            LOGI("After assigning  Overlay-Manager to Overlay");
-            LOGI("overlaymanagerpath= %s, overlaymanagername= %s",overlayobj->overlaymanagerpath,overlaymanagername);
+        /* Set the manager to the overlay */
+        if (sysfile_write(overlayobj->overlaymanagerpath, \
+            &managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername, PATH_MAX) < 0) {
+            LOGE("Unable to set the overlay->manager");
+            return -1;
+        }
 
 #ifdef TARGET_OMAP4
 
-            /** Set the manager display to the panel*/
-            if (sysfile_write(managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managerdisplay, \
-                screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displayname, PATH_MAX) < 0) {
-                LOGE("Unable to set the manager->display");
-                ret = -1;
-                goto end;
-            }
+        /** set the manager display to the panel*/
+        if (sysfile_write(managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managerdisplay, \
+            screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displayname, PATH_MAX) < 0) {
+            LOGE("Unable to set the manager->display");
+            return -1;
+        }
 #else
-            char displaytimings[PATH_MAX];
-            sprintf(displaytimings, "/sys/devices/platform/omapdss/display%d/timings", overlayobj->mDisplayMetaData.mPanelIndex);
-            if (!strcmp(managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername, "tv")) {
-                if (sysfile_write(displaytimings, "ntsc", sizeof("ntsc")) < 0) {
-                    LOGE("Setting display timings failed");
-                    ret = -1;
-                    goto end;
-                }
+        char displaytimings[PATH_MAX];
+        sprintf(displaytimings, "/sys/devices/platform/omapdss/display%d/timings", overlayobj->mDisplayMetaData.mPanelIndex);
+        if (!strcmp(managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername, "tv")) {
+            if (sysfile_write(displaytimings, "ntsc", sizeof("ntsc")) < 0) {
+                LOGE("Setting display timings failed");
+                return -1;
             }
-#endif
         }
 
-        // Enable the requested panel here
+#endif
+        //enable the requested panel here
         if (sysfile_write(screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displayenabled, "1", sizeof("1")) < 0) {
             LOGE("Panel enable failed");
-            ret = -1;
-            goto end;
+            return -1;
         }
 
-#ifdef TARGET_OMAP4
-        //Read timings after display has been enabled as they could have changed
-        char displaytimingspath[PATH_MAX];
-        sprintf(displaytimingspath, "/sys/devices/platform/omapdss/display%d/timings",
-                overlayobj->mDisplayMetaData.mPanelIndex);
-        if (sysfile_read(displaytimingspath,
-            (void*)(&screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displaytimings), PATH_MAX) < 0) {
-            LOGE("display get timings failed");
-            ret = -1;
+        // Disable streaming to ensure that stream_on is called again which indirectly sets overlayenabled to 1
+        if ((ret = overlay_data_context_t::disable_streaming(overlayobj, false))) {
+            LOGE("Stream Off Failed!/%d\n", ret);
             goto end;
-        }
-        LOGD("Display timings [%s]\n", screenMetaData[overlayobj->mDisplayMetaData.mPanelIndex].displaytimings);
-#endif
-
-        if (overlayobj->mData.s3d_active) {
-            //Currently need to disable streaming to change display id
-            ret = v4l2_overlay_set_display_id(fd,data->panel);
-            if(ret)
-                LOGE("failed to set display ID\n");
-
-            ret = v4l2_overlay_set_s3d_mode(fd,overlayobj->mData.s3d_mode);
-            if(ret)
-                LOGE("failed to reset S3D mode\n");
         }
     }
+    LOG_FUNCTION_NAME_EXIT;
+    return 0;
 
-	LOG_FUNCTION_NAME_EXIT;
-    return ret;
-	
 end:
     pthread_mutex_unlock(&overlayobj->lock);
     LOG_FUNCTION_NAME_EXIT;
     return ret;
 
-}
-
-int overlay_control_context_t::CommitLinkDevice(struct overlay_control_device_t *dev,
-                          overlay_object* overlayobj) {
-    LOG_FUNCTION_NAME_ENTRY;
-    if ((dev == NULL) || (overlayobj == NULL)) {
-        LOGE("Null Arguments / Overlay not initd");
-        return -1;
-    }
-
-    overlay_control_context_t *self = (overlay_control_context_t *)dev;
-    int pipelineId = -1;
-    overlay_ctrl_t   *data   = overlayobj->data();
-    int ret = 0;
-    overlay_ctrl_t finalWindow;
-    int linkfd = overlayobj->getctrl_linkvideofd();
-    overlay_data_t eCropData;
-
-    calculateDisplayMetaData(overlayobj, KCloneDevice);
-
-    //Calculate window size. As of now this is applicable only for non-LCD panels
-    calculateWindow(overlayobj, &finalWindow, KCloneDevice);
-
-    LOGI("Link Position/X%d/Y%d/W%d/H%d\n", data->posX, data->posY, data->posW, data->posH );
-    LOGI("Link Adjusted Position/X%d/Y%d/W%d/H%d\n", finalWindow.posX, finalWindow.posY, finalWindow.posW, finalWindow.posH);
-    LOGI("Rotation/%d\n", data->rotation );
-    LOGI("alpha/%d\n", data->alpha );
-    LOGI("zorder/%d\n", data->zorder );
-
-    // Disable streaming to ensure that stream_on is called again which indirectly sets overlayenabled to 1
-    if ((ret = overlay_data_context_t::disable_streaming_locked(overlayobj, false))) {
-        LOGE("Stream Off Failed!/%d\n", ret);
-        goto end;
-    }
-
-    if ((ret = v4l2_overlay_set_rotation(linkfd, data->rotation, 0, data->mirror))) {
-        LOGE("Set Rotation Failed!/%d\n", ret);
-        goto end;
-    }
-
-    if (v4l2_overlay_set_crop(linkfd, overlayobj->mData.cropX, overlayobj->mData.cropY,\
-                              overlayobj->mData.cropW, overlayobj->mData.cropH)) {
-        LOGE("Failed defaulting crop window\n");
-        goto end;
-    }
-
-    v4l2_overlay_getId(linkfd, &pipelineId);
-
-    if ((pipelineId >= 0) && (pipelineId <= MAX_NUM_OVERLAYS)) {
-        char overlaymanagerpath[PATH_MAX];
-        sprintf(overlaymanagerpath, "/sys/devices/platform/omapdss/overlay%d/manager", pipelineId);
-        sysfile_write(overlaymanagerpath, managerMetaData[overlayobj->mDisplayMetaData.mManagerIndex].managername,\
-                                          sizeof("2lcd"));
-    }
-
-    if ((ret = v4l2_overlay_set_position(linkfd, finalWindow.posX, finalWindow.posY, finalWindow.posW, finalWindow.posH))) {
-        LOGE("Set Position Failed!/%d\n", ret);
-        goto end;
-    }
-
-    if (data->colorkey < 0) {
-        if ((ret = v4l2_overlay_set_colorkey(linkfd, 0, 0x00, 0x00))) {
-            LOGE("Failed enabling color key\n");
-            goto end;
-        }
-    }
-    else {
-        if ((ret = v4l2_overlay_set_colorkey(linkfd, 0, data->colorkey, EVIDEO_SOURCE))) {
-            LOGE("Failed enabling color key\n");
-            goto end;
-        }
-    }
-
-    //Currently not supported with V4L2_S3D driver
-    if (!overlayobj->mData.s3d_active) {
-        //Set up the z-order for the overlay:
-        //TBD:Surface flinger or the driver has to re-work the zorder of all the
-        //other active overlays for a given manager to service the current request.
-        if ((ret = v4l2_overlay_set_zorder(linkfd, data->zorder))) {
-             LOGE("Failed setting zorder\n");
-             goto end;
-
-        }
-    }
-
-
-end:
-    LOG_FUNCTION_NAME_EXIT;
-    return ret;
 }
 
 int overlay_control_context_t::overlay_control_close(struct hw_device_t *dev)
@@ -1872,6 +1269,7 @@ int overlay_data_context_t::overlay_initialize(struct overlay_data_device_t *dev
     int ovlyfd = static_cast<const struct handle_t *>(handle)->overlayobj_sharedfd;
     int size = static_cast<const struct handle_t *>(handle)->overlayobj_size;
     int video_fd = static_cast<const struct handle_t *>(handle)->video_fd;
+
     overlay_object* overlayobj = overlay_control_context_t::open_shared_overlayobj(ovlyfd, size);
     if (overlayobj == NULL) {
         LOGE("Overlay Initialization failed");
@@ -1893,11 +1291,7 @@ int overlay_data_context_t::overlay_initialize(struct overlay_data_device_t *dev
     ctx->omap_overlay->mData.cropW = overlayobj->w;
     ctx->omap_overlay->mData.cropH = overlayobj->h;
 
-    //S3D Default value set from createOverlay
-    ctx->omap_overlay->mData.s3d_mode = overlayobj->mData.s3d_mode;
-    ctx->omap_overlay->mData.s3d_fmt = overlayobj->mData.s3d_fmt;
-    ctx->omap_overlay->mData.s3d_order = overlayobj->mData.s3d_order;
-    ctx->omap_overlay->mData.s3d_subsampling = overlayobj->mData.s3d_subsampling;
+
 
     if (fstat(video_fd, &stat)) {
            LOGE("Error = %s from %s\n", strerror(errno), "overlay initialize");
@@ -1917,7 +1311,6 @@ int overlay_data_context_t::overlay_initialize(struct overlay_data_device_t *dev
             overlay_control_context_t::close_shared_overlayobj(ctx->omap_overlay);
     } else {
         for (i = 0; i < ctx->omap_overlay->num_buffers; i++) {
-            ctx->omap_overlay->buffers[i] = NULL;
             rc = v4l2_overlay_map_buf(video_fd, i, &ctx->omap_overlay->buffers[i],
                                        &ctx->omap_overlay->buffers_len[i]);
             if (rc) {
@@ -1930,13 +1323,12 @@ int overlay_data_context_t::overlay_initialize(struct overlay_data_device_t *dev
     ctx->omap_overlay->mappedbufcount = ctx->omap_overlay->num_buffers;
     LOG_FUNCTION_NAME_EXIT;
     LOGD("Initialize ret = %d", rc);
-    InitDisplayManagerMetaData();
     return ( rc );
 }
 
 int overlay_data_context_t::overlay_resizeInput(struct overlay_data_device_t *dev, uint32_t w, uint32_t h)
 {
-    LOGD("overlay_resizeInput %dx%d %d", (int)w, (int)h, (int) ((struct overlay_data_context_t*)dev)->omap_overlay->num_buffers);
+    LOGD("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
     LOG_FUNCTION_NAME_ENTRY;
     if (dev == NULL) {
         LOGE("Null Arguments ");
@@ -1948,8 +1340,6 @@ int overlay_data_context_t::overlay_resizeInput(struct overlay_data_device_t *de
     uint32_t numb = NUM_OVERLAY_BUFFERS_REQUESTED;
     overlay_data_t eCropData;
     int degree = 0;
-    int link_fd = -1;
-    uint32_t mirror = 0;
 
     // Position and output width and heigh
     int32_t _x = 0;
@@ -1979,7 +1369,6 @@ int overlay_data_context_t::overlay_resizeInput(struct overlay_data_device_t *de
 
     int fd = ctx->omap_overlay->getdata_videofd();
     overlay_ctrl_t *stage = ctx->omap_overlay->staging();
-    int linkfd = ctx->omap_overlay->getdata_linkvideofd();
 
     if ((ctx->omap_overlay->w == (unsigned int)w) && (ctx->omap_overlay->h == (unsigned int)h) && (ctx->omap_overlay->attributes_changed == 0)){
         LOGE("Same as current width and height. Attributes did not change either. So do nothing.");
@@ -2006,11 +1395,12 @@ int overlay_data_context_t::overlay_resizeInput(struct overlay_data_device_t *de
         LOGD(" Could not set the position when creating overlay \n");
         goto end;
     }
-
-    if ((ret = v4l2_overlay_get_rotation(fd, &degree, NULL, &mirror))) {
+#ifndef KERNEL_35_WA
+    if ((ret = v4l2_overlay_get_rotation(fd, &degree, NULL))) {
         LOGD("Get rotation value failed! \n");
         goto end;
     }
+#endif
 
     for (int i = 0; i < ctx->omap_overlay->mappedbufcount; i++) {
         v4l2_overlay_unmap_buf(ctx->omap_overlay->buffers[i], ctx->omap_overlay->buffers_len[i]);
@@ -2024,21 +1414,19 @@ int overlay_data_context_t::overlay_resizeInput(struct overlay_data_device_t *de
     //Update the overlay object with the new width and height
     ctx->omap_overlay->w = w;
     ctx->omap_overlay->h = h;
-    
-    LOGI("Set rotation degree in resizeInput = %d\n", degree);
-
-    if ((ret = v4l2_overlay_set_rotation(fd, degree, 0, mirror))) {
+#ifndef KERNEL_35_WA
+    if ((ret = v4l2_overlay_set_rotation(fd, degree, 0))) {
         LOGE("Failed rotation\n");
         goto end;
     }
-
+#endif
      if ((ret = v4l2_overlay_set_crop(fd, eCropData.cropX, eCropData.cropY, eCropData.cropW, eCropData.cropH))) {
         LOGE("Failed crop window\n");
         goto end;
     }
 #ifndef TARGET_OMAP4
-    if ((ret = v4l2_overlay_set_colorkey(fd, 0, 0x00, 0x00))) {
-        LOGE("Failed enabling color key\n");
+    if (v4l2_overlay_set_local_alpha(fd, 1)){	
+        LOGE("Failed enabling Local Alpha\n");
         goto end;
     }
 #endif
@@ -2048,21 +1436,12 @@ int overlay_data_context_t::overlay_resizeInput(struct overlay_data_device_t *de
         goto end;
     }
 
-    if (link_fd > 0) {
-        if ((ret = v4l2_overlay_req_buf(linkfd, (uint32_t *)(&ctx->omap_overlay->num_buffers),
-            ctx->omap_overlay->cacheable_buffers, ctx->omap_overlay->maintain_coherency, EMEMORY_USRPTR))) {
-            LOGE("Error creating linked buffers2");
-            goto end;
-        }
-    }
-
-    if ((ret = v4l2_overlay_req_buf(fd, (uint32_t *)(&ctx->omap_overlay->num_buffers), ctx->omap_overlay->cacheable_buffers, ctx->omap_overlay->maintain_coherency, EMEMORY_MMAP))) {
+    if ((ret = v4l2_overlay_req_buf(fd, (uint32_t *)(&ctx->omap_overlay->num_buffers), ctx->omap_overlay->cacheable_buffers, ctx->omap_overlay->maintain_coherency))) {
         LOGE("Error creating buffers");
         goto end;
     }
 
     for (int i = 0; i < ctx->omap_overlay->num_buffers; i++) {
-		ctx->omap_overlay->buffers[i] = NULL;			
         v4l2_overlay_map_buf(fd, i, &ctx->omap_overlay->buffers[i], &ctx->omap_overlay->buffers_len[i]);
     }
 
@@ -2096,7 +1475,8 @@ int overlay_data_context_t::overlay_data_setParameter(struct overlay_data_device
         LOGI("Overlay Not Init'd!\n");
         return -1;
     }
-	if ( ctx->omap_overlay->dataReady ) {
+
+    if ( ctx->omap_overlay->dataReady ) {
         LOGI("Too late. Cant set it now!\n");
         return -1;
     }
@@ -2126,87 +1506,20 @@ int overlay_data_context_t::overlay_data_setParameter(struct overlay_data_device
         ctx->omap_overlay->num_buffers = MIN(value, NUM_OVERLAY_BUFFERS_MAX);
         ctx->omap_overlay->attributes_changed = 1;
         break;
-
-    case SET_CLONE_FD:
-        if (value <= 0) {
-            int linkfd = ctx->omap_overlay->getdata_linkvideofd();
-            if (linkfd >= 0) {
-                ctx->omap_overlay->setdata_linkvideofd(-1);
-                close(linkfd);
-            }
-            return 0;
-        }
-        ctx->omap_overlay->setdata_linkvideofd(value);
+    // workaround for camera
+    case CHECK_CAMERA:
+    	if (value == 1)
+    	{
+    		ctx->omap_overlay->IsCamera = 1;
+    		LOGE("overlay_data_setParameter CHECK_CAMERA");
+    	}
+        break;
     }
 
     LOG_FUNCTION_NAME_EXIT;
     return ( ret );
 }
 
-int overlay_data_context_t::overlay_set_s3d_params(struct overlay_data_device_t *dev, uint32_t s3d_mode,
-                           uint32_t s3d_fmt, uint32_t s3d_order, uint32_t s3d_subsampling) {
-
-    //LOG_FUNCTION_NAME_ENTRY
-    if (dev == NULL) {
-        LOGE("Null Arguments[%d]", __LINE__);
-        return -1;
-    }
-
-    if ((OVERLAY_S3D_MODE_ANAGLYPH  < (int)s3d_fmt || ((int)s3d_fmt < OVERLAY_S3D_MODE_OFF)) ||
-        (OVERLAY_S3D_FORMAT_FRM_SEQ < (int)s3d_fmt || ((int)s3d_fmt < OVERLAY_S3D_FORMAT_NONE)) ||
-        (OVERLAY_S3D_ORDER_RF < (int)s3d_order || ((int)s3d_order < OVERLAY_S3D_ORDER_LF)) ||
-        (OVERLAY_S3D_SS_VERT < (int)s3d_subsampling || ((int)s3d_subsampling < OVERLAY_S3D_SS_NONE))){
-        LOGE("Invalid Arguments [%d]", __LINE__);
-        return -1;
-    }
-
-    int ret = 0;
-    struct overlay_data_context_t* ctx = (struct overlay_data_context_t*)dev;
-
-    if (ctx->omap_overlay == NULL) {
-        LOGE("Shared Data Not Init'd!\n");
-        return -1;
-    }
-
-    int fd = ctx->omap_overlay->getdata_videofd();
-    pthread_mutex_lock(&ctx->omap_overlay->lock);
-
-    if (ctx->omap_overlay->mData.s3d_mode != s3d_mode)
-    {
-        if ((ret = v4l2_overlay_set_s3d_mode(fd, s3d_mode))) {
-            LOGE("Set S3D mode Failed!/%d\n", ret);
-            pthread_mutex_unlock(&ctx->omap_overlay->lock);
-            return ret;
-        }
-        ctx->omap_overlay->mData.s3d_mode = s3d_mode;
-        LOGI("[s3d_params functions] s3d mode/%d\n",  s3d_mode);
-    }
- /*
-    if ((ret = ctx->disable_streaming_locked(ctx->omap_overlay))) {
-         LOGE("Disable stream Failed!/%d\n", ret);
-        pthread_mutex_unlock(&ctx->omap_overlay->lock);
-        return ret;
-    }
-    */
-
-    if (ctx->omap_overlay->mData.s3d_fmt != s3d_fmt || ctx->omap_overlay->mData.s3d_order != s3d_order
-        || ctx->omap_overlay->mData.s3d_subsampling != s3d_subsampling)
-    {
-        if ((ret = v4l2_overlay_set_s3d_format(fd, s3d_fmt, s3d_order,s3d_subsampling))) {
-        LOGE("Set S3D format Failed!/%d\n", ret);
-        pthread_mutex_unlock(&ctx->omap_overlay->lock);
-        return ret;
-        }
-        ctx->omap_overlay->mData.s3d_fmt = s3d_fmt;
-        ctx->omap_overlay->mData.s3d_order = s3d_order;
-        ctx->omap_overlay->mData.s3d_subsampling = s3d_subsampling;
-    }
-
-    LOG_FUNCTION_NAME_EXIT;
-
-    pthread_mutex_unlock(&ctx->omap_overlay->lock);
-    return ret;
-}
 
 int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, uint32_t x,
                            uint32_t y, uint32_t w, uint32_t h) {
@@ -2232,13 +1545,10 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
     }
     if (ctx->omap_overlay->mData.cropX == x && ctx->omap_overlay->mData.cropY == y && ctx->omap_overlay->mData.cropW == w
         && ctx->omap_overlay->mData.cropH == h) {
-        LOGI("Nothing to do!\n");
-        if (ctx->omap_overlay->getdata_linkvideofd() <= 0) {
-            return 0;
-        }
+        //LOGI("Nothing to do!\n");
+        return 0;
     }
     int fd = ctx->omap_overlay->getdata_videofd();
-    int linkfd = ctx->omap_overlay->getdata_linkvideofd();
 
     pthread_mutex_lock(&ctx->omap_overlay->lock);
 
@@ -2262,16 +1572,14 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
     ctx->omap_overlay->mData.cropW = w;
     ctx->omap_overlay->mData.cropH = h;
 
-    LOGD("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
+    LOGE("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
 
     rc = v4l2_overlay_set_crop(fd, x, y, w, h);
     if (rc) {
         LOGE("Set Crop Window Failed!/%d\n", rc);
     }
 
-    overlay_control_context_t::calculateDisplayMetaData(ctx->omap_overlay, ctx->omap_overlay->data()->panel);
-    overlay_control_context_t::calculateWindow(ctx->omap_overlay, &finalWindow, ctx->omap_overlay->data()->panel, false);
-
+    overlay_control_context_t::calculateWindow(ctx->omap_overlay, &finalWindow);
     if ((rc = v4l2_overlay_set_position(fd, finalWindow.posX, finalWindow.posY, finalWindow.posW, finalWindow.posH))) {
         LOGD(" Could not set the position when setting the crop \n");
         goto end;
@@ -2289,40 +1597,21 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
         ctx->omap_overlay->mData.cropW = w;
         ctx->omap_overlay->mData.cropH = h;
 
-        LOGD("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
+        LOGE("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
         rc = v4l2_overlay_set_crop(fd, x, y, w, h);
         if (rc) {
             LOGE("Set Crop Window Failed!/%d\n", rc);
             goto end;
         }
-
-        overlay_control_context_t::calculateDisplayMetaData(ctx->omap_overlay, ctx->omap_overlay->data()->panel);
-        overlay_control_context_t::calculateWindow(ctx->omap_overlay, &finalWindow, ctx->omap_overlay->data()->panel, false);
-
+        overlay_control_context_t::calculateWindow(ctx->omap_overlay, &finalWindow);
         if ((rc = v4l2_overlay_set_position(fd, finalWindow.posX, finalWindow.posY, finalWindow.posW, finalWindow.posH))) {
             LOGD(" Could not set the position when setting the crop \n");
             goto end;
         }
-
-        if (linkfd > 0) {
-            rc = v4l2_overlay_set_crop(linkfd, x, y, w, h);
-            if (rc) {
-                LOGE("LINK: Set Crop Window Failed!/%d\n", rc);
-                goto end;
-            }
-
-            overlay_control_context_t::calculateDisplayMetaData(ctx->omap_overlay, KCloneDevice);
-            overlay_control_context_t::calculateWindow(ctx->omap_overlay, &finalWindow, KCloneDevice, false);
-
-            if ((rc = v4l2_overlay_set_position(linkfd, finalWindow.posX, finalWindow.posY, finalWindow.posW, finalWindow.posH))) {
-                LOGD(" LINK: Could not set the position when setting the crop \n");
-                goto end;
-            }
-        }
     }
     else {
-        /** setCrop is called only with the crop co-ordinates change
-        * this is allowed on-the-fly. Hence no need of disabling the stream and
+        /** setCrop is called only with the crop co-ordinates change and
+        * is allowed on-the-fly. Hence no need of disabling the stream and
         * the final window remains the same
         */
         ctx->omap_overlay->mData.cropX = x;
@@ -2330,19 +1619,16 @@ int overlay_data_context_t::overlay_setCrop(struct overlay_data_device_t *dev, u
         ctx->omap_overlay->mData.cropW = w;
         ctx->omap_overlay->mData.cropH = h;
 
+        LOGE("Crop Win/X%d/Y%d/W%d/H%d\n", x, y, w, h );
+
         rc = v4l2_overlay_set_crop(fd, x, y, w, h);
         if (rc) {
             LOGE("Set Crop Window Failed!/%d\n", rc);
         }
-        if (linkfd > 0) {
-            rc = v4l2_overlay_set_crop(linkfd, x, y, w, h);
-            if (rc) {
-                LOGE("Set Crop Window Failed!/%d\n", rc);
-            }
-        }
     }
 #endif
 
+    LOG_FUNCTION_NAME_EXIT;
 end:
     pthread_mutex_unlock(&ctx->omap_overlay->lock);
     return rc;
@@ -2372,11 +1658,9 @@ int overlay_data_context_t::overlay_dequeueBuffer(struct overlay_data_device_t *
 
     struct overlay_data_context_t* ctx = (struct overlay_data_context_t*)dev;
     int fd = ctx->omap_overlay->getdata_videofd();
-    int linkfd = ctx->omap_overlay->getdata_linkvideofd();
+
     int rc;
-    int rc1;
     int i = -1;
-    int ii = -1;
 
     pthread_mutex_lock(&ctx->omap_overlay->lock);
     if (ctx->omap_overlay->streamEn == 0) {
@@ -2389,14 +1673,10 @@ int overlay_data_context_t::overlay_dequeueBuffer(struct overlay_data_device_t *
         rc = -EPERM;
     }
 
-    else if ( (rc = v4l2_overlay_dq_buf(fd, &i, EMEMORY_MMAP, NULL, 0 )) != 0 ) {
+    else if ( (rc = v4l2_overlay_dq_buf(fd, &i )) != 0 ) {
         LOGE("Failed to DQ/%d\n", rc);
-       //in order to recover from DQ failure scenario, let's disable the stream.
-       //the stream gets re-enabled in the subsequent Q buffer call
-       //if streamoff also fails!!! just return the errorcode to the client
-       rc = disable_streaming_locked(ctx->omap_overlay, true);
-       if (rc == 0) { rc = -1; } //this is required for TIHardwareRenderer
     }
+
     else if ( i < 0 || i > ctx->omap_overlay->num_buffers ) {
         LOGE("dqbuffer i=%d",i);
         rc = -EPERM;
@@ -2406,13 +1686,6 @@ int overlay_data_context_t::overlay_dequeueBuffer(struct overlay_data_device_t *
         ctx->omap_overlay->qd_buf_count --;
         LOGV("INDEX DEQUEUE = %d", i);
         LOGV("qd_buf_count --");
-    }
-
-    if (linkfd > 0) {
-        if ( (rc1 = v4l2_overlay_dq_buf(linkfd, &ii, EMEMORY_USRPTR, ctx->omap_overlay->buffers[i],
-            ctx->omap_overlay->mapping_data->length)) != 0 ) {
-            LOGE("Failed to DQ link/%d\n", rc1);
-        }
     }
 
     LOGV("qd_buf_count = %d", ctx->omap_overlay->qd_buf_count);
@@ -2439,7 +1712,6 @@ int overlay_data_context_t::overlay_queueBuffer(struct overlay_data_device_t *de
         return -1;
     }
     int fd = ctx->omap_overlay->getdata_videofd();
-    int linkfd = ctx->omap_overlay->getdata_linkvideofd();
 
     if ( !ctx->omap_overlay->controlReady ) {
         LOGI("Control not ready but queue buffer requested!!!\n");
@@ -2455,36 +1727,25 @@ int overlay_data_context_t::overlay_queueBuffer(struct overlay_data_device_t *de
    noofbuffer++;
 #endif
 
-    pthread_mutex_lock(&ctx->omap_overlay->lock);
-
-    int rc = v4l2_overlay_q_buf(fd, (int)buffer, EMEMORY_MMAP, NULL, 0);
-    if (rc < 0) {
-        LOGD("queueBuffer failed. rc = %d", rc);
-        rc = -EPERM;
-        goto EXIT;
-    }
-
-    if (linkfd > 0) {
-        rc = v4l2_overlay_q_buf(linkfd, (int)buffer, EMEMORY_USRPTR, ctx->omap_overlay->buffers[(int)buffer],
-                  ctx->omap_overlay->mapping_data->length);
-        if (rc < 0) {
-            LOGE("link queueBuffer failed. rc = %d", rc);
-            rc = 0;
-        }
-    }
+   pthread_mutex_lock(&ctx->omap_overlay->lock);
+   int rc = v4l2_overlay_q_buf(fd, (int)buffer);
+   if (rc < 0) {
+       LOGD("queueBuffer failed. rc = %d", rc);
+       rc = -EPERM;
+       goto EXIT;
+   }
 
     if (ctx->omap_overlay->qd_buf_count < ctx->omap_overlay->num_buffers && rc == 0) {
         ctx->omap_overlay->qd_buf_count ++;
     }
 
-    if (ctx->omap_overlay->streamEn == 0) {
+    if ((ctx->omap_overlay->streamEn == 0)/*&&(ctx->omap_overlay->qd_buf_count  > 2)*/) {
+    	LOGE("Prak:Wait for one buffer\n");
         /*DSS2: 2 buffers need to be queue before enable streaming*/
         ctx->omap_overlay->dataReady = 1;
-        rc = ctx->enable_streaming_locked(ctx->omap_overlay);
+        ctx->enable_streaming_locked(ctx->omap_overlay);
     }
-    if (rc == 0) {
-        rc = ctx->omap_overlay->qd_buf_count;
-    }
+    rc = ctx->omap_overlay->qd_buf_count;
 
 EXIT:
     pthread_mutex_unlock(&ctx->omap_overlay->lock);
@@ -2509,8 +1770,12 @@ void* overlay_data_context_t::overlay_getBufferAddress(struct overlay_data_devic
     int fd = ctx->omap_overlay->getdata_videofd();
     ret = v4l2_overlay_query_buffer(fd, (int)buffer, &buf);
     if (ret)
+    {
+//[[OVL-DE-Q_PATCH
+        ctx->omap_overlay->mapping_data->nQueuedToOverlay = -1;   //OVL_DE-Q_PATCH //NCB-TI  0 Not Q to Ovl, 1 Q to Ovl, -1 Query returned Error.
+//OVL_DE-Q_PATCH]]
         return NULL;
-
+    }
     // Initialize ctx->mapping_data
     memset(ctx->omap_overlay->mapping_data, 0, sizeof(mapping_data_t));
 
@@ -2518,6 +1783,16 @@ void* overlay_data_context_t::overlay_getBufferAddress(struct overlay_data_devic
     ctx->omap_overlay->mapping_data->length = buf.length;
     ctx->omap_overlay->mapping_data->offset = buf.m.offset;
     ctx->omap_overlay->mapping_data->ptr = NULL;
+    //[[ OVL_DE-Q_PATCH
+    if((buf.flags & V4L2_BUF_FLAG_QUEUED) || (buf.flags & V4L2_BUF_FLAG_DONE))
+    {
+        ctx->omap_overlay->mapping_data->nQueuedToOverlay = 1;   //OVL_DE-Q_PATCH //NCB-TI  0 Not Q to Ovl, 1 Q to Ovl, -1 Query returned Error.
+    }
+    else
+    {
+        ctx->omap_overlay->mapping_data->nQueuedToOverlay = 0;   //OVL_DE-Q_PATCH //NCB-TI  0 Not Q to Ovl, 1 Q to Ovl, -1 Query returned Error.
+    }
+    // OVL_DE-Q_PATCH]]
 
     if ((int)buffer >= 0 && (int)buffer < ctx->omap_overlay->num_buffers) {
         ctx->omap_overlay->mapping_data->ptr = ctx->omap_overlay->buffers[(int)buffer];
@@ -2526,7 +1801,6 @@ void* overlay_data_context_t::overlay_getBufferAddress(struct overlay_data_devic
     }
 
     return (void *)ctx->omap_overlay->mapping_data;
-
 }
 
 int overlay_data_context_t::overlay_getBufferCount(struct overlay_data_device_t *dev)
@@ -2574,11 +1848,6 @@ int overlay_data_context_t::overlay_data_close(struct hw_device_t *dev) {
         ctx->omap_overlay->buffers = NULL;
         ctx->omap_overlay->buffers_len = NULL;
 
-        int linkfd = ctx->omap_overlay->getdata_linkvideofd();
-        if (linkfd >= 0) {
-            close(linkfd);
-        }
-
         pthread_mutex_unlock(&ctx->omap_overlay->lock);
 
         ctx->omap_overlay->dataReady = 0;
@@ -2587,7 +1856,6 @@ int overlay_data_context_t::overlay_data_close(struct hw_device_t *dev) {
         free(ctx);
     }
 
-	LOG_FUNCTION_NAME_EXIT
     return 0;
 }
 
@@ -2619,16 +1887,12 @@ static int overlay_device_open(const struct hw_module_t* module,
 
         dev->get = overlay_control_context_t::overlay_get;
         dev->createOverlay = overlay_control_context_t::overlay_createOverlay;
-        //S3D
-        dev->createOverlay_S3D = overlay_control_context_t::overlay_createOverlay;
         dev->destroyOverlay = overlay_control_context_t::overlay_destroyOverlay;
         dev->setPosition = overlay_control_context_t::overlay_setPosition;
         dev->getPosition = overlay_control_context_t::overlay_getPosition;
         dev->setParameter = overlay_control_context_t::overlay_setParameter;
         dev->stage = overlay_control_context_t::overlay_stage;
         dev->commit = overlay_control_context_t::overlay_commit;
-        //clone
-        dev->requestOverlayClone = overlay_control_context_t::overlay_requestOverlayClone;
 
         *device = &dev->common;
         for (int i = 0; i < MAX_NUM_OVERLAYS; i++)
@@ -2665,8 +1929,6 @@ static int overlay_device_open(const struct hw_module_t* module,
         dev->queueBuffer = overlay_data_context_t::overlay_queueBuffer;
         dev->getBufferAddress = overlay_data_context_t::overlay_getBufferAddress;
         dev->getBufferCount = overlay_data_context_t::overlay_getBufferCount;
-        //S3D
-        dev->set_s3d_params = overlay_data_context_t::overlay_set_s3d_params;
 
         *device = &dev->common;
          status = 0;
@@ -2675,8 +1937,6 @@ static int overlay_device_open(const struct hw_module_t* module,
         status = - ENOMEM;
     }
   }
-
-    LOG_FUNCTION_NAME_EXIT
     return status;
 }
 

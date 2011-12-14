@@ -27,5 +27,7 @@
 #define TSPDRV_ENABLE_AMP           _IO(TSPDRV_MAGIC_NUMBER & 0xFF, 3)
 #define TSPDRV_DISABLE_AMP          _IO(TSPDRV_MAGIC_NUMBER & 0xFF, 4)
 #define TSPDRV_GET_NUM_ACTUATORS    _IO(TSPDRV_MAGIC_NUMBER & 0xFF, 5)
+#define VIBE_CHANGE_PWM                     9   // cdy for vibe tunning
+#define VIBE_CHANCE_DUTYCYCLE               10  // cdy for vibe duty cycle change
 
 #endif /* __TSPDRV_H */

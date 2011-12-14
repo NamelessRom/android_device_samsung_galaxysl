@@ -94,7 +94,7 @@ namespace android {
 		return true;
 	}	
 
-	int CameraHal::CameraSetFrameRate()
+	int CameraHal::setCaptureFrameRate()
 	{
 		struct v4l2_streamparm parm;
 		int framerate = 30;
@@ -125,14 +125,15 @@ s_fmt_fail:
 
 	}
 
-	int CameraHal::initCameraSetFrameRate()
+	int CameraHal::setPreviewFrameRate()
 	{       
 		struct v4l2_streamparm parm;
 		int framerate = 30;
 
 		LOG_FUNCTION_NAME   
 
-		framerate = mParameters.getPreviewFrameRate();
+		framerate = mParameters.getPreviewFrameRate();		
+        HAL_PRINT("setPreviewFrameRate: framerate=%d\n",framerate);
 
 		if(mCameraIndex == MAIN_CAMERA)
 		{
@@ -143,8 +144,8 @@ s_fmt_fail:
 					case 7:			
 					case 10:
 					case 15:
+						framerate = 15;
 						break;
-
 					default:
 						framerate = 15;
 						break;
@@ -183,6 +184,7 @@ s_fmt_fail:
 				case 7:
 				case 10:
 				case 15:
+					framerate = 15;
 					break;
 
 				default:
@@ -352,7 +354,7 @@ s_fmt_fail:
 	{
 		int image_width, image_height, preview_width, preview_height;
 		unsigned long base, offset;
-
+		
 		struct v4l2_buffer buffer; // for VIDIOC_QUERYBUF and VIDIOC_QBUF
 		struct v4l2_format format;
 		struct v4l2_buffer cfilledbuffer; // for VIDIOC_DQBUF
@@ -386,110 +388,114 @@ s_fmt_fail:
 
 		LOG_FUNCTION_NAME
 
+		if (setCaptureFrameRate())
+		{
+			LOGE("Error in setting Camera frame rate\n");
+			return -1;
+		}
 
-		/* Shutter CB */
+		HAL_PRINT("\n\n\n PICTURE NUMBER =%d\n\n\n",++pictureNumber);
+
+		mParameters.getPictureSize(&image_width, &image_height);
+		mParameters.getPreviewSize(&preview_width, &preview_height);	
+		HAL_PRINT("Picture Size: Width = %d \t Height = %d\n", image_width, image_height);
+		HAL_PRINT("Preview Size: Width = %d \t Height = %d\n", preview_width, preview_height);
+
+#if OPEN_CLOSE_WORKAROUND
+		close(camera_device);
+		camera_device = open(VIDEO_DEVICE, O_RDWR);
+		if (camera_device < 0) 
+		{
+			LOGE ("!!!!!!!!!FATAL Error: Could not open the camera device: %s!!!!!!!!!\n",
+					strerror(errno) );
+		}
+#endif
+
+		if(mCamera_Mode == CAMERA_MODE_JPEG)
+		{
+			int jpeg_width = GetJPEG_Capture_Width();
+			int jpeg_height = GetJPEG_Capture_Height();
+			capture_len = jpeg_width * jpeg_height * 2;
+		}
+		else
+		{
+			capture_len = image_width * image_height * 2;
+		}
+
+		if (capture_len & 0xfff)
+		{
+			capture_len = (capture_len & 0xfffff000) + 0x1000;
+		}
+
+		HAL_PRINT("pictureFrameSize = 0x%x = %d\n", capture_len, capture_len);
+
+		mPictureHeap = new MemoryHeapBase(capture_len);
+
+		base = (unsigned long)mPictureHeap->getBase();
+		base = (base + 0xfff) & 0xfffff000;
+		offset = base - (unsigned long)mPictureHeap->getBase();
+
+		/* set size & format of the video image */
+		format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		format.fmt.pix.width = image_width;
+		format.fmt.pix.height = image_height;
+		
+		if(mCamera_Mode == CAMERA_MODE_JPEG)
+			format.fmt.pix.pixelformat = PIXEL_FORMAT_JPEG;
+		else
+			format.fmt.pix.pixelformat = PIXEL_FORMAT;
+
+		if (ioctl(camera_device, VIDIOC_S_FMT, &format) < 0)
+		{
+			LOGE ("Failed to set VIDIOC_S_FMT.\n");
+			return -1;
+		}
+		
+#if OMAP_SCALE
+        if(mCameraIndex == VGA_CAMERA && mCamMode != VT_MODE) {
+            if(orientation == 0 || orientation == 180) {
+                struct v4l2_control vc;            
+                CLEAR(vc);
+                vc.id = V4L2_CID_FLIP;                
+                vc.value = CAMERA_FLIP_MIRROR;
+                if (ioctl (camera_device, VIDIOC_S_CTRL, &vc) < 0) {
+                    LOGE("V4L2_CID_FLIP fail!\n");
+                    return UNKNOWN_ERROR;  
+                }
+            }
+        }
+#endif  
+
+		/* Shutter CallBack */
 		if(mMsgEnabled & CAMERA_MSG_SHUTTER)
 		{
 			mNotifyCb(CAMERA_MSG_SHUTTER,0,0,mCallbackCookie);
+		} 
+
+		/* Check if the camera driver can accept 1 buffer */
+		creqbuf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		creqbuf.memory = V4L2_MEMORY_USERPTR;
+		creqbuf.count  = 1;
+		if (ioctl(camera_device, VIDIOC_REQBUFS, &creqbuf) < 0)
+		{
+			LOGE ("VIDIOC_REQBUFS Failed. errno = %d\n", errno);
+			return -1;
 		}
 
-	        if (CameraSetFrameRate())
-	        {
-	            LOGE("Error in setting Camera frame rate\n");
-	            return -1;
-	        }
+		buffer.type = creqbuf.type;
+		buffer.memory = creqbuf.memory;
+		buffer.index = 0;
+		if (ioctl(camera_device, VIDIOC_QUERYBUF, &buffer) < 0) {
+			LOGE("VIDIOC_QUERYBUF Failed");
+			return -1;
+		}
 
-	        HAL_PRINT("\n\n\n PICTURE NUMBER =%d\n\n\n",++pictureNumber);
+		buffer.m.userptr = base;
+		mPictureBuffer = new MemoryBase(mPictureHeap, offset, buffer.length);
+		LOGD("Picture Buffer: Base = %p Offset = 0x%x\n", (void *)base, (unsigned int)offset);
 
-	    mParameters.getPictureSize(&image_width, &image_height);
-	    mParameters.getPreviewSize(&preview_width, &preview_height);
-
-
-
-	    HAL_PRINT("Picture Size: Width = %d \tHeight = %d\n", image_width, image_height);
-	    HAL_PRINT("Picture Size: preview_width = %d \npreview_height = %d\n", preview_width, preview_height);
-
-	#if OPEN_CLOSE_WORKAROUND
-	        close(camera_device);
-	        camera_device = open(VIDEO_DEVICE, O_RDWR);
-	        if (camera_device < 0)
-	        {
-	            LOGE ("!!!!!!!!!FATAL Error: Could not open the camera device: %s!!!!!!!!!\n",
-	            strerror(errno) );
-	        }
-	#endif
-
-	    format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	    format.fmt.pix.width = image_width;
-	    format.fmt.pix.height = image_height;
-	    if(mCamera_Mode == CAMERA_MODE_JPEG)
-	    {
-	        format.fmt.pix.pixelformat = PIXEL_FORMAT_JPEG;
-	    }
-	    else
-	    {
-	        format.fmt.pix.pixelformat = PIXEL_FORMAT;
-	    }
-
-	        /* set size & format of the video image */
-	        if (ioctl(camera_device, VIDIOC_S_FMT, &format) < 0)
-	        {
-	            LOGE ("Failed to set VIDIOC_S_FMT.\n");
-	            return -1;
-	        }
-
-	        /* Check if the camera driver can accept 1 buffer */
-	        creqbuf.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	        creqbuf.memory = V4L2_MEMORY_USERPTR;
-	        creqbuf.count  = 1;
-	        if (ioctl(camera_device, VIDIOC_REQBUFS, &creqbuf) < 0)
-	        {
-	            LOGE ("VIDIOC_REQBUFS Failed. errno = %d\n", errno);
-	            return -1;
-	        }
-
-	        if(mCamera_Mode == CAMERA_MODE_JPEG)
-	        {
-	            int jpeg_width = GetJPEG_Capture_Width();
-	            int jpeg_height = GetJPEG_Capture_Height();
-	            format.fmt.pix.sizeimage = jpeg_width * jpeg_height * 2;
-	            capture_len = format.fmt.pix.sizeimage;
-	        }
-	        else
-	        {
-	            capture_len = image_width * image_height * 2;
-	        }
-
-	    if (capture_len & 0xfff)
-	    {
-	        capture_len = (capture_len & 0xfffff000) + 0x1000;
-	    }
-
-	    HAL_PRINT("pictureFrameSize = 0x%x = %d\n", capture_len, capture_len);
-
-	    mPictureHeap = new MemoryHeapBase(capture_len);
-
-	    base = (unsigned long)mPictureHeap->getBase();
-			base = (base + 0xfff) & 0xfffff000;
-
-	        offset = base - (unsigned long)mPictureHeap->getBase();
-
-	        buffer.type = creqbuf.type;
-	        buffer.memory = creqbuf.memory;
-	        buffer.index = 0;
-
-	    if (ioctl(camera_device, VIDIOC_QUERYBUF, &buffer) < 0) {
-	        LOGE("VIDIOC_QUERYBUF Failed");
-	        return -1;
-	    }
-
-	        capture_len = buffer.length;
-
-	    buffer.m.userptr = base;
-	    mPictureBuffer = new MemoryBase(mPictureHeap, offset, capture_len);
-	    LOGD("Picture Buffer: Base = %p Offset = 0x%x\n", (void *)base, (unsigned int)offset);
 		if (ioctl(camera_device, VIDIOC_QBUF, &buffer) < 0) {
-			LOGE("CAMERA VIDIOC_QBUF Failed, Error=%s ,errno = %d\n", strerror(errno), errno);
+			LOGE("CAMERA VIDIOC_QBUF Failed");
 			return -1;
 		}
 
@@ -525,7 +531,7 @@ s_fmt_fail:
 #endif
 		/* turn off streaming */
 		creqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		if (ioctl(camera_device, VIDIOC_STREAMOFF, &creqbuf.type) < 0)
+		if (ioctl(camera_device, VIDIOC_STREAMOFF, &creqbuf.type) < 0) 
 		{
 			LOGE("VIDIOC_STREAMON Failed\n");
 			return -1;
@@ -591,10 +597,7 @@ s_fmt_fail:
 #ifdef HARDWARE_OMX
 				if(twoSecondReviewMode == 1)
 				{
-					//DrawOverlay(pYUVDataBuf, true);
-					LOGD("Test2 index #%d", index);
-                    queueToOverlay(lastOverlayBufferDQ);
-                    dequeueFromOverlay();
+					DrawOverlay(pYUVDataBuf, true);
 				}
 #endif //HARDWARE_OMX
 				if(mMsgEnabled & CAMERA_MSG_RAW_IMAGE)
@@ -643,6 +646,17 @@ s_fmt_fail:
 			PPM("YUV COLOR ROTATION STARTED\n");
 #endif                   
 
+#if 0	//YUV dump code for testing
+			FILE* fIn = NULL;	
+			fIn = fopen("/data/output.yuv", "w");
+			if ( fIn == NULL ) 	  
+			{ 		 
+				LOGE("Error: failed to open the file for writing\n");		 
+			}		
+			fwrite((uint8_t*)mVGANewheap->base(), 1, mPreviewWidth*mPreviewHeight*2, fIn);	   
+			fclose(fIn);
+#endif
+
 			/*
 			   	for VGA capture case
 				pYUVDataBuf : Input buffer from Camera Driver YUV422.
@@ -673,11 +687,7 @@ s_fmt_fail:
 
 				}							    					
 			}
-#if OMAP_SCALE
-			TempHeapBase.clear();
-			TempBase.clear();
-			TempHeap.clear();
-#endif
+
 #if TIMECHECK
 			PPM("YUV COLOR ROTATION Done\n");
 #endif
@@ -760,10 +770,11 @@ s_fmt_fail:
 
 			if(twoSecondReviewMode == 1)
 			{ 	
-				//DrawOverlay(yuv_buffer, true);
-				LOGD("Test1 index #%d", index);
-                queueToOverlay(lastOverlayBufferDQ);
-                dequeueFromOverlay();
+#if OMAP_SCALE
+				DrawOverlay((uint8_t*)mVGANewheap->base(), true);
+#else
+				DrawOverlay(yuv_buffer, true);
+#endif
 			}  
 			//yuv_buffer: [Reused]Output buffer with YUV 420P 270 degree rotated.             
 			if(mMsgEnabled & CAMERA_MSG_RAW_IMAGE)
@@ -786,16 +797,17 @@ s_fmt_fail:
 
 		if(mCamera_Mode == CAMERA_MODE_YUV)
 		{
-			if(mCameraIndex == VGA_CAMERA)
-			{
-				mVGAYUVPictureBuffer.clear();
-				mVGAYUVPictureHeap.clear();
-			}
+			mVGAYUVPictureBuffer.clear();
+			mVGAYUVPictureHeap.clear();
+#if OMAP_SCALE
+			TempHeapBase.clear();
+			TempBase.clear();
+			TempHeap.clear();
+#endif
 		}
 
 		delete []pExifBuf;
 		mCaptureFlag = false;
-		LOGD("Waleedq test");
 		LOG_FUNCTION_NAME_EXIT
 
 		return NO_ERROR;

@@ -18,23 +18,21 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#define OVERLAY_DEBUG 1
+//#define OVERLAY_DEBUG 1
 #define LOG_TAG "Overlay-V4L2"
-#define LOG_NDEBUG 0
 
 #include <fcntl.h>
 #include <errno.h>
 #include <cutils/log.h>
 #include <hardware/overlay.h>
-#include "../include/videodev2.h"
+#include <linux/videodev.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <stdlib.h>
 #include "v4l2_utils.h"
 #include <cutils/properties.h>
-#include <sys/poll.h>
 
-#define LOG_FUNCTION_NAME    LOGV("%s: %s",  __FILE__, __FUNCTION__);
+#define LOG_FUNCTION_NAME    LOGE("%s: %s",  __FILE__, __FUNCTION__);
 
 #ifndef LOGE
 #define LOGE(fmt,args...) \
@@ -85,7 +83,6 @@ int v4l2_overlay_open(int id)
     LOG_FUNCTION_NAME
     char v4l2_dev_name[PATH_MAX];
     sprintf(v4l2_dev_name, "/dev/video%d", id + 1);
-    LOGI ("Openning %s\n", v4l2_dev_name);
     return open(v4l2_dev_name, O_RDWR);
 }
 
@@ -131,7 +128,6 @@ void dump_window(struct v4l2_window *win)
     LOGI("window t: %d ", win->w.top);
     LOGI("window w: %d ", win->w.width);
     LOGI("window h: %d\n", win->w.height);
-    LOGI("window zorder: %d\n", win->zorder);
 }
 void v4l2_overlay_dump_state(int fd)
 {
@@ -211,6 +207,7 @@ int configure_pixfmt(struct v4l2_pix_format *pix, int32_t fmt,
     case OVERLAY_FORMAT_CbYCrY_422_I:
         pix->pixelformat = V4L2_PIX_FMT_UYVY;
         break;
+#if 0
     case OVERLAY_FORMAT_YCbCr_420_SP_SEQ_TB:
         /* NV12 Interlaced (Sequential Top-Bottom).
            Just update pix.field, and  NV12 params */
@@ -218,6 +215,7 @@ int configure_pixfmt(struct v4l2_pix_format *pix, int32_t fmt,
         pix->pixelformat = V4L2_PIX_FMT_NV12;
         pix->bytesperline = 4096;
         break;
+#endif
     case OVERLAY_FORMAT_YCbCr_420_SP:
         pix->pixelformat = V4L2_PIX_FMT_NV12;
         pix->bytesperline = 4096;
@@ -328,8 +326,8 @@ int v4l2_overlay_set_position(int fd, int32_t x, int32_t y, int32_t w, int32_t h
     LOGV("v4l2_overlay_set_position:: w=%d h=%d", format.fmt.win.w.width, format.fmt.win.w.height);
 
     if (mRotateOverlay) {
-        w = 800;//480;  // chris-sdc
-        h = 480;//800;  // chris-sdc
+        w = 480;
+        h = 800;
         x = 0;
         y = 0;
     }
@@ -395,17 +393,12 @@ int v4l2_overlay_get_crop(int fd, uint32_t *x, uint32_t *y, uint32_t *w, uint32_
 }
 
 
-int v4l2_overlay_set_rotation(int fd, int degree, int step, uint32_t mirror)
+int v4l2_overlay_set_rotation(int fd, int degree, int step)
 {
     LOG_FUNCTION_NAME
 
     int ret;
     struct v4l2_control ctrl;
-    memset(&ctrl, 0, sizeof(ctrl));
-    ctrl.id = V4L2_CID_VFLIP;
-    ctrl.value = mirror;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_CTRL, &ctrl, "set FLIP");
-
     memset(&ctrl, 0, sizeof(ctrl));
     ctrl.id = V4L2_CID_ROTATE;
     ctrl.value = degree;
@@ -417,13 +410,14 @@ int v4l2_overlay_set_rotation(int fd, int degree, int step, uint32_t mirror)
     return ret;
 }
 
-int v4l2_overlay_get_rotation(int fd, int* degree, int step, uint32_t* mirror)
+int v4l2_overlay_get_rotation(int fd, int* degree, int step)
 {
     LOG_FUNCTION_NAME
     int ret;
     struct v4l2_control control;
     memset(&control, 0, sizeof(control));
     control.id = V4L2_CID_ROTATE;
+
     ret = ioctl (fd, VIDIOC_G_CTRL, &control);
     if (ret < 0) {
         error (fd, "VIDIOC_G_CTRL id: V4L2_CID_ROTATE ioctl");
@@ -434,22 +428,11 @@ int v4l2_overlay_get_rotation(int fd, int* degree, int step, uint32_t* mirror)
         control.value = 90;
     }
     *degree = control.value;
-
-    memset(&control, 0, sizeof(control));
-    control.id = V4L2_CID_VFLIP;
-    ret = ioctl (fd, VIDIOC_G_CTRL, &control);
-    if (ret < 0) {
-        error (fd, "VIDIOC_G_CTRL id: V4L2_CID_VFLIP ioctl");
-        return ret;
-    }
-
-    *mirror = control.value;
-
     return ret;
 }
 
 
-int v4l2_overlay_set_colorkey(int fd, int enable, int colorkey, int keyType)
+int v4l2_overlay_set_colorkey(int fd, int enable, int colorkey)
 {
     LOG_FUNCTION_NAME
 
@@ -462,28 +445,11 @@ int v4l2_overlay_set_colorkey(int fd, int enable, int colorkey, int keyType)
 
     if (ret)
         return ret;
-#ifdef TARGET_OMAP4
-    if (enable)
-    {
-        if (keyType == EVIDEO_SOURCE) {
-            fbuf.flags &= ~V4L2_FBUF_FLAG_CHROMAKEY;
-            fbuf.flags |= V4L2_FBUF_FLAG_SRC_CHROMAKEY;
-        } else {
-            fbuf.flags |= V4L2_FBUF_FLAG_CHROMAKEY;
-            fbuf.flags &= ~V4L2_FBUF_FLAG_SRC_CHROMAKEY;
-        }
-    }
-    else
-    {
-        fbuf.flags &= ~V4L2_FBUF_FLAG_CHROMAKEY;
-        fbuf.flags &= ~V4L2_FBUF_FLAG_SRC_CHROMAKEY;
-    }
-#else
+
     if (enable)
         fbuf.flags |= V4L2_FBUF_FLAG_CHROMAKEY;
     else
         fbuf.flags &= ~V4L2_FBUF_FLAG_CHROMAKEY;
-#endif
 
     ret = v4l2_overlay_ioctl(fd, VIDIOC_S_FBUF, &fbuf, "enable colorkey");
 
@@ -505,37 +471,6 @@ int v4l2_overlay_set_colorkey(int fd, int enable, int colorkey, int keyType)
         ret = v4l2_overlay_ioctl(fd, VIDIOC_S_FMT, &fmt, "set colorkey");
     }
 
-    return ret;
-}
-
-int v4l2_overlay_set_zorder(int fd, int value)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_format fmt;
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_VIDEO_OVERLAY;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_G_FMT, &fmt, "get zorder");
-    if (ret)
-        return ret;
-
-    fmt.fmt.win.zorder = value & 0x3;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_FMT, &fmt, "set zorder");
-    return ret;
-}
-
-int v4l2_overlay_get_zorder(int fd, int* value)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_format fmt;
-    memset(&fmt, 0, sizeof(fmt));
-    fmt.type = V4L2_BUF_TYPE_VIDEO_OVERLAY;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_G_FMT, &fmt, "get zorder");
-    if (ret)
-        return ret;
-
-    *value = fmt.fmt.win.zorder;
     return ret;
 }
 
@@ -592,16 +527,16 @@ int v4l2_overlay_set_local_alpha(int fd, int enable)
         return ret;
 
     if (enable)
-        fbuf.flags |= V4L2_FBUF_FLAG_LOCAL_ALPHA;
+        fbuf.flags = V4L2_FBUF_FLAG_LOCAL_ALPHA;
     else
         fbuf.flags &= ~V4L2_FBUF_FLAG_LOCAL_ALPHA;
 
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_FBUF, &fbuf, "enable global alpha");
+    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_FBUF, &fbuf, "enable local alpha");
 
     return ret;
 }
 
-int v4l2_overlay_req_buf(int fd, uint32_t *num_bufs, int cacheable_buffers, int maintain_coherency, int memtype)
+int v4l2_overlay_req_buf(int fd, uint32_t *num_bufs, int cacheable_buffers, int maintain_coherency)
 {
     LOG_FUNCTION_NAME
 
@@ -609,10 +544,6 @@ int v4l2_overlay_req_buf(int fd, uint32_t *num_bufs, int cacheable_buffers, int 
     int ret, i;
     reqbuf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
     reqbuf.memory = V4L2_MEMORY_MMAP;
-    if (memtype == EMEMORY_USRPTR)
-    {
-        reqbuf.memory = V4L2_MEMORY_USERPTR;
-    }
     reqbuf.count = *num_bufs;
     reqbuf.reserved[0] = cacheable_buffers | (maintain_coherency << 1); /* Bit 0 = cacheable_buffers, Bit 1 = maintain_coherency */
     LOGV("reqbuf.reserved[0] = %x", reqbuf.reserved[0]);
@@ -682,12 +613,11 @@ int v4l2_overlay_map_buf(int fd, int index, void **start, size_t *len)
 
     *len = buf.length;
     *start = mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED,
-                  fd, buf.m.offset & ~(PAGE_SIZE - 1));
+                  fd, buf.m.offset);
     if (*start == MAP_FAILED) {
         LOGE("map failed, length=%u offset=%u\n", buf.length, buf.m.offset);
         return -EINVAL;
     }
-    *((__u32 **) start) += buf.m.offset & (PAGE_SIZE - 1);
     return 0;
 }
 
@@ -695,7 +625,7 @@ int v4l2_overlay_unmap_buf(void *start, size_t len)
 {
     LOG_FUNCTION_NAME
 
-    return munmap((void *) (~(PAGE_SIZE - 1) & (__u32) start), len);
+    return munmap(start, len);
 }
 
 
@@ -720,7 +650,7 @@ int v4l2_overlay_stream_off(int fd)
     return v4l2_overlay_ioctl(fd, VIDIOC_STREAMOFF, &type, "stream off");
 }
 
-int v4l2_overlay_q_buf(int fd, int index, int memtype, void* buffer, size_t length)
+int v4l2_overlay_q_buf(int fd, int index)
 {
     //LOG_FUNCTION_NAME
     struct v4l2_buffer buf;
@@ -738,22 +668,15 @@ int v4l2_overlay_q_buf(int fd, int index, int memtype, void* buffer, size_t leng
     buf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
     buf.index = index;
     buf.memory = V4L2_MEMORY_MMAP;
-    if (memtype == EMEMORY_USRPTR)
-    {
-        buf.memory = V4L2_MEMORY_USERPTR;
-        buf.m.userptr = (unsigned long)buffer;
-        buf.length = length;
-    }
     buf.flags = 0;
 
     return v4l2_overlay_ioctl(fd, VIDIOC_QBUF, &buf, "qbuf");
 }
 
-int v4l2_overlay_dq_buf(int fd, int *index, int memtype, void* buffer, size_t length)
+int v4l2_overlay_dq_buf(int fd, int *index)
 {
     struct v4l2_buffer buf;
     int ret;
-    struct pollfd p;
 
     /*
     ret = v4l2_overlay_query_buffer(fd, buffer_cookie, index, &buf);
@@ -765,35 +688,12 @@ int v4l2_overlay_dq_buf(int fd, int *index, int memtype, void* buffer, size_t le
         return -EINVAL
     }
     */
-    /* check if buffer is available */
-
-    /* use poll() to timeout gracefully */
-    p.fd     = fd;
-    p.events = POLLOUT;
-
-    /* for now use 1/15s for timeout */
-	ret = poll(&p, 1, 250);  // Tushar - OMAPS00245785 - [] - Changed it to 1/4s OR 4 FPS i.e. 250ms from 67ms
-
-    if (ret <= 0)
-    {
-	LOGE("ERROR:v4l2_overlay_dq_buf ret = %d, errno = %d", ret, errno);	//shinuk.lee_to_check_errorno
-        return ret ? -errno : -EIO;
-    }
-	
     buf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
     buf.memory = V4L2_MEMORY_MMAP;
-    if (memtype == EMEMORY_USRPTR)
-    {
-        buf.memory = V4L2_MEMORY_USERPTR;
-        buf.m.userptr = (unsigned long)buffer;
-        buf.length = length;
-    }
+
     ret = v4l2_overlay_ioctl(fd, VIDIOC_DQBUF, &buf, "dqbuf");
     if (ret)
-    {
-	LOGE("ERROR:v4l2_overlay_dq_buf ret = %d, errno = %d", ret, errno);	//shinuk.lee_to_check_errorno
-      	return errno;
-    }
+      return ret;
     *index = buf.index;
     return 0;
 }
@@ -814,177 +714,6 @@ int v4l2_overlay_getId(int fd, int* id)
     *id = ctrl.value;
      return ret;
 }
-
-enum v4l2_s3d_mode get_s3d_mode(uint32_t mode)
-{
-    switch(mode) {
-        default:
-        case OVERLAY_S3D_MODE_OFF:
-            return V4L2_S3D_MODE_OFF;
-        case OVERLAY_S3D_MODE_ON:
-            return V4L2_S3D_MODE_ON;
-        case OVERLAY_S3D_MODE_ANAGLYPH:
-            return V4L2_S3D_MODE_ANAGLYPH;
-    }
-}
-
-uint32_t set_s3d_mode(enum v4l2_s3d_mode mode)
-{
-    switch(mode) {
-        default:
-        case V4L2_S3D_MODE_OFF:
-            return OVERLAY_S3D_MODE_OFF;
-        case V4L2_S3D_MODE_ON:
-            return OVERLAY_S3D_MODE_ON;
-        case V4L2_S3D_MODE_ANAGLYPH:
-            return OVERLAY_S3D_MODE_ANAGLYPH;
-    }
-}
-
-int v4l2_overlay_set_s3d_mode(int fd, uint32_t mode)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_control ctrl;
-    memset(&ctrl, 0, sizeof(ctrl));
-    ctrl.id = V4L2_CID_PRIVATE_S3D_MODE;
-    ctrl.value = get_s3d_mode(mode);
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_CTRL, &ctrl, "set s3d mode");
-    return ret;
-}
-
-int v4l2_overlay_get_s3d_mode(int fd, uint32_t *mode)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_control ctrl;
-    memset(&ctrl, 0, sizeof(ctrl));
-    ctrl.id = V4L2_CID_PRIVATE_S3D_MODE;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_G_CTRL, &ctrl, "get s3d mode");
-    *mode = set_s3d_mode(ctrl.value);
-
-    return ret;
-}
-
-int v4l2_overlay_set_display_id(int fd, uint32_t id)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_control ctrl;
-    memset(&ctrl, 0, sizeof(ctrl));
-    ctrl.id = V4L2_CID_PRIVATE_DISPLAY_ID;
-    ctrl.value = id;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_CTRL, &ctrl, "set display ID");
-
-    return ret;
-}
-
-int v4l2_overlay_set_anaglyph_type(int fd, uint32_t id)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_control ctrl;
-    memset(&ctrl, 0, sizeof(ctrl));
-    ctrl.id = V4L2_CID_PRIVATE_ANAGLYPH_TYPE;
-    ctrl.value = id;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_CTRL, &ctrl, "set anaglpyh type");
-
-    return ret;
-}
-
-void configure_s3d_format(struct v4l2_frame_packing *frame_packing,
-                        uint32_t fmt, uint32_t order, uint32_t subsampling)
-{
-    enum v4l2_frame_pack_type type;
-    enum v4l2_frame_pack_order v4l2_order;
-    enum v4l2_frame_pack_sub_sample v4l2_subsampling;
-
-    switch(fmt) {
-        default:
-        case OVERLAY_S3D_FORMAT_NONE:
-            type = V4L2_FPACK_NONE;
-            break;
-        case OVERLAY_S3D_FORMAT_OVERUNDER:
-            type = V4L2_FPACK_OVERUNDER;
-            break;
-        case OVERLAY_S3D_FORMAT_SIDEBYSIDE:
-            type = V4L2_FPACK_SIDEBYSIDE;
-            break;
-        case OVERLAY_S3D_FORMAT_ROW_IL:
-            type = V4L2_FPACK_ROW_IL;
-            break;
-        case OVERLAY_S3D_FORMAT_COL_IL:
-            type = V4L2_FPACK_COL_IL;
-            break;
-        case OVERLAY_S3D_FORMAT_PIX_IL:
-            type = V4L2_FPACK_PIX_IL;
-            break;
-        case OVERLAY_S3D_FORMAT_CHECKB:
-            type = V4L2_FPACK_CHECKB;
-            break;
-        case OVERLAY_S3D_FORMAT_FRM_SEQ:
-            type = V4L2_FPACK_FRM_SEQ;
-            break;
-    }
-
-    switch(order) {
-        default:
-        case OVERLAY_S3D_ORDER_LF:
-            v4l2_order = V4L2_FPACK_ORDER_LF;
-            break;
-        case OVERLAY_S3D_ORDER_RF:
-            v4l2_order = V4L2_FPACK_ORDER_RF;
-            break;
-    }
-
-    switch(subsampling) {
-        default:
-        case OVERLAY_S3D_SS_NONE:
-            v4l2_subsampling = V4L2_FPACK_SS_NONE;
-            break;
-        case OVERLAY_S3D_SS_HOR:
-            v4l2_subsampling = V4L2_FPACK_SS_HOR;
-            break;
-        case OVERLAY_S3D_SS_VERT:
-            v4l2_subsampling = V4L2_FPACK_SS_VERT;
-            break;
-    }
-
-    frame_packing->type = type;
-    frame_packing->order = v4l2_order;
-    frame_packing->sub_samp = v4l2_subsampling;
-}
-
-int v4l2_overlay_set_s3d_format(int fd, uint32_t fmt, uint32_t order, uint32_t subsampling)
-{
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_format format;
-
-    format.type = V4L2_BUF_TYPE_PRIVATE;
-    configure_s3d_format((struct v4l2_frame_packing *)format.fmt.raw_data, fmt, order, subsampling);
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_S_FMT, &format, "set s3d format");
-
-    return ret;
-
-}
-
-int v4l2_overlay_get_s3d_format(int fd, uint32_t *fmt, uint32_t *order, uint32_t *subsampling)
-{
-
-    LOG_FUNCTION_NAME
-    int ret;
-    struct v4l2_format format;
-
-    format.type = V4L2_BUF_TYPE_PRIVATE;
-    ret = v4l2_overlay_ioctl(fd, VIDIOC_G_FMT, &format, "get s3d format");
-    *fmt = ((struct v4l2_frame_packing *)format.fmt.raw_data)->type;
-    *order =((struct v4l2_frame_packing *)format.fmt.raw_data)->order;
-    *subsampling = ((struct v4l2_frame_packing *)format.fmt.raw_data)->sub_samp;
-
-    return ret;
-}
-
 
 /*
 Copies 2D buffer to 1D buffer. All heights, widths etc. should be in bytes.

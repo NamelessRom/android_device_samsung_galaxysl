@@ -1,4 +1,3 @@
-
 LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
@@ -22,7 +21,6 @@ LOCAL_C_INCLUDES += \
     frameworks/base/include/camera \
     frameworks/base/include/binder \
     frameworks/base/include/ui \
-    hardware/ti/omap3/liboverlay \
     device/samsung/galaxysl/liboverlay
 
 LOCAL_CFLAGS += -fno-short-enums 
@@ -41,7 +39,9 @@ LOCAL_C_INCLUDES += \
     hardware/ti/omx/system/src/openmax_il/common/inc \
     hardware/ti/omx/video/src/openmax_il/prepost_processor/inc \
     hardware/ti/omx/system/src/openmax_il/resource_manager_proxy/inc \
-    hardware/ti/omx/system/src/openmax_il/resource_manager/resource_activity_monitor/inc
+    hardware/ti/omx/system/src/openmax_il/resource_manager/resource_activity_monitor/inc \
+    hardware/ti/omx/image/src/openmax_il/jpeg_enc/inc \
+    external/libexif
 
 LOCAL_CFLAGS += -O0 -g3 -fpic -fstrict-aliasing -DIPP_LINUX -D___ANDROID___ -DHARDWARE_OMX
 
@@ -49,6 +49,7 @@ LOCAL_SHARED_LIBRARIES += \
     libbridge \
     libLCML \
     libOMX_Core 
+#    libOMX_ResourceManagerProxy
 
 endif
 
@@ -71,19 +72,17 @@ LOCAL_SHARED_LIBRARIES += \
     libcapl \
     libImagePipeline
 
-LOCAL_CFLAGS += -O0 -g3 -DIPP_LINUX -D___ANDROID___ -DFW3A -DICAP -DIMAGE_PROCESSING_PIPELINE
+LOCAL_CFLAGS += -O0 -g3 -DIPP_LINUX -D___ANDROID___ -DFW3A -DICAP -DIMAGE_PROCESSING_PIPELINE #_MMS -DCAMERA_ALGO
 
 endif
 endif
 
 LOCAL_MODULE:= libcamera
 LOCAL_MODULE_TAGS:= optional
-
 LOCAL_WHOLE_STATIC_LIBRARIES:= libyuv
 
 include $(BUILD_SHARED_LIBRARY)
 include $(LOCAL_PATH)/Neon/android.mk
-
 ################################################
 
 #ifdef HARDWARE_OMX
@@ -97,7 +96,6 @@ include $(LOCAL_PATH)/Neon/android.mk
 #LOCAL_SHARED_LIBRARIES := libcamera
 
 #LOCAL_MODULE := JpegEncoderTest
-#LOCAL_MODULE_TAGS:= optional
 
 #include $(BUILD_EXECUTABLE)
 
@@ -109,13 +107,11 @@ include $(LOCAL_PATH)/Neon/android.mk
 
 #LOCAL_SRC_FILES := CameraHalTest.cpp
 
-#LOCAL_C_INCLUDES := device/samsung/galaxysl/liboverlay \
-#                    hardware/ti/omap3/liboverlay
+#LOCAL_C_INCLUDES := hardware/ti/omap3/liboverlay
 
 #LOCAL_SHARED_LIBRARIES := libcamera
 
 #LOCAL_MODULE := CameraHalTest
-#LOCAL_MODULE_TAGS:= optional
 
 #include $(BUILD_EXECUTABLE)
 

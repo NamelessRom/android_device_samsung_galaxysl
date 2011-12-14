@@ -41,10 +41,8 @@
 #include <camera/CameraHardwareInterface.h>
 #include "MessageQueue.h"
 
-//[for EXIF
 #include <cutils/tztime.h>
 #include <math.h>
-
 #include "Exif.h"
 #include "ExifCreator.h"
 
@@ -52,14 +50,13 @@ extern "C" {
 	#include <stdio.h>
 	#include <sys/types.h>
 }
-//]
 
 #include "videodev2.h"
 #include "RotationInterface.h"
 #include "overlay_common.h"
 
 //[Debugging Options
-#define HAL_DEBUGGING		1
+#define HAL_DEBUGGING		0
 #define TIMECHECK			0
 #define CHECK_FRAMERATE		0
 
@@ -74,16 +71,18 @@ extern "C" {
 //]
 
 #define CAMERA_MSG_ASD      0x204
-#define EVE_CAM //NCB-TI
+#define EVE_CAM 				// NCB-TI
 #define VT_BACKGROUND_SOLUTION	// Latona TD/Heron : It's for VT of CMCC projects
+
 #define CAMERA_MODE_JPEG    1
 #define CAMERA_MODE_YUV     2
+
 #define MAIN_CAMERA         0
 #define VGA_CAMERA          1
+
 #define RESIZER             1
 #define JPEG                1
-
-#define OMAP_SCALE			1	// RealCAM Preview & Capture landscpae view option for GB
+#define OMAP_SCALE			1	// FrontCAM Preview & Capture landscpae view option for GB
 
 #define CLEAR(x) memset (&(x), 0, sizeof (x))
 
@@ -173,13 +172,13 @@ namespace android {
 //#define LIB3AFW "libMMS3AFW.so"	// 3A FW
 
 #define PHOTO_PATH 								"/sdcard/photo_%02d.%s"
-
+/*
 #define START_CMD     							0x0
 #define STOP_CMD      							0x1
 #define RUN_CMD       							0x2
 #define TAKE_PICTURE  							0x3
 #define NOOP          							0x4
-
+*/
 #define CAMERA_MODE    							1
 #define CAMCORDER_MODE 							2
 #define VT_MODE        							3
@@ -249,9 +248,9 @@ namespace android {
 			virtual status_t dump(int fd, const Vector<String16>& args) const;
 			//] In "CameraHardwareInterface.h" functions
 
-			static int beginAutoFocusThread(void *cookie);
-			virtual void autoFocusThread();
+			static int beginAutoFocusThread(void *cookie);			
 			static int beginCancelAutoFocusThread(void *cookie);
+			virtual void autoFocusThread();
 			virtual void cancelAutoFocusThread();
 			void dumpFrame(void *buffer, int size, char *path);
 			void initDefaultParameters(int cameraId);
@@ -300,8 +299,6 @@ namespace android {
 			static int onSaveLSC(void *priv, void *buf, int size);
 			static int onSaveRAW(void *priv, void *buf, int size);
 
-			CameraHal(int cameraId);
-			virtual ~CameraHal();
 			void previewThread(int cameraId);
 			static int beginPictureThread(void *cookie);
 
@@ -315,20 +312,13 @@ namespace android {
 			//Eclair Camera L25.12
 
 			void nextPreview();
-            void queueToOverlay(int index);
-            int dequeueFromOverlay();
-            bool __queueToCamera(int index, int line);
-#define queueToCamera(x) __queueToCamera(x, __LINE__)
-            int dequeueFromCamera(nsecs_t *timestamp);
 			int ICapturePerform();
 			int ICaptureCreate(void);
 			int ICaptureDestroy(void);
 			int CapturePicture();
 			
-			//[for EXIF
 			void CreateExif(unsigned char* pInThumbnailData,int Inthumbsize,unsigned char* pOutExifBuf,int& OutExifSize,int flag);
-			bool CreateJpegWithExif(unsigned char* pInJpegData, int InJpegSize,unsigned char* pInExifBuf,
-					int InExifSize,unsigned char* pOutJpegData, int& OutJpegSize);	
+			bool CreateJpegWithExif(unsigned char* pInJpegData, int InJpegSize,unsigned char* pInExifBuf, int InExifSize,unsigned char* pOutJpegData, int& OutJpegSize);	
 			int GetJpegImageSize();
 			int GetThumbNailDataSize();
 			int GetThumbNailOffset();
@@ -339,20 +329,18 @@ namespace android {
 			void convertFromDecimalToGPSFormat(double,int&,int&,double&);
 			void getExifInfoFromDriver(v4l2_exif* );
 			int convertToExifLMH(int, int);
-			//]
 			
 			int CameraCreate(int );
 			int CameraDestroy();
 			int CameraConfigure();	
-			int CameraSetFrameRate();
-			int initCameraSetFrameRate();
+			int setCaptureFrameRate();
+			int setPreviewFrameRate();
 			int CameraStart();
 			int CameraStop();
 			int SaveFile(char *filename, char *ext, void *buffer, int jpeg_size);
 
-			int isStart_JPEG;
-			int isStart_VPP;
-			int isStart_Scale;
+			CameraHal(int cameraId);
+			virtual ~CameraHal();
 
 			status_t setWB(const char* wb);
 			status_t setEffect(const char* effect);
@@ -384,15 +372,6 @@ namespace android {
 			status_t setGPSTimestamp(long gps_timestamp);
 			status_t setGPSProcessingMethod(const char *gps_processingmethod);
 			status_t setJpegThumbnailSize(imageInfo imgInfo);
-
-			enum AE_AWB_LOCK_UNLOCK
-			{
-				AE_UNLOCK_AWB_UNLOCK = 0,
-				AE_LOCK_AWB_UNLOCK,
-				AE_UNLOCK_AWB_LOCK,
-				AE_LOCK_AWB_LOCK,
-				AE_AWB_MAX
-			};
 			
 			int setAEAWBLockUnlock(int, int );
 			int setObjectPosition(int, int);
@@ -402,11 +381,6 @@ namespace android {
 			int setDefultIMEI(int );		
 			int setCAFStart(int );	
 			int setCAFStop(int );		
-
-			int m_touch_af_start_stop;
-			int m_focus_mode;
-			int m_iso;
-			int m_default_imei;
 
 			void setDatalineCheckStart();
 			void setDatalineCheckStop();
@@ -475,6 +449,10 @@ namespace android {
 #ifdef SAMSUNG_SECURITY
 			int getSecurityCheck(void);
 #endif
+			int isStart_JPEG;
+			int isStart_VPP;
+			int isStart_Scale;
+
 			mutable Mutex mLock;
 			CameraParameters mParameters;
 			sp<MemoryHeapBase> mPictureHeap;
@@ -494,13 +472,13 @@ namespace android {
 
 			int iOutStandingBuffersWithEncoder;
 			int iConsecutiveVideoFrameDropCount;
-
-			int  mPreviewFrameSize;
-			sp<Overlay>  mOverlay;
-			sp<PreviewThread>  mPreviewThread;
-			bool mPreviewRunning;
-			Mutex               mRecordingLock;
+			int mPreviewFrameSize;
 			int mRecordingFrameSize;
+						
+			sp<Overlay>  		mOverlay;
+			sp<PreviewThread> 	mPreviewThread;
+			bool 				mPreviewRunning;
+			Mutex               mRecordingLock;
 			// Video Frame Begin
 			int                 mVideoBufferCount;
 			sp<MemoryHeapBase>  mVideoHeap;
@@ -524,16 +502,6 @@ namespace android {
 			int                 mVideoBufferUsing[VIDEO_FRAME_COUNT_MAX];
 			int                 mRecordingFrameCount;
 			void*               mPreviewBlocks[VIDEO_FRAME_COUNT_MAX];
-
-#define BUFF_IDLE       (0)
-#define BUFF_Q2DSS      (1)
-#define BUFF_Q2VE       (1<<1)
-
-#ifdef DEBUG_LOG
-    void debugShowBufferStatus();
-#else
-#define debugShowBufferStatus()
-#endif
 		
 			int nOverlayBuffersQueued;
 			int nCameraBuffersQueued;
@@ -562,70 +530,66 @@ namespace android {
 			int lastOverlayBufferDQ;
 #ifdef EVE_CAM
 			int mBufferCount_422;				
-#endif 	
-
-			/*--------------Eclair Camera HAL---------------------*/	
+#endif 				
 			notify_callback 			mNotifyCb;
 			data_callback   			mDataCb;
 			data_callback_timestamp 	mDataCbTimestamp;
 			void                 		*mCallbackCookie;
 			int32_t	mMsgEnabled;
-			bool    mRecordEnabled; 
 			nsecs_t mCurrentTime;   
-			bool mFalsePreview;
-			bool mRecorded;
-			bool mAutoFocusRunning;	
-			int mPreviousWB;
-			int mPreviousEffect;
-			int mPreviousAntibanding;
-			int mPreviousSceneMode;
-			int mPreviousFlashMode;
-			int mPreviousBrightness;
-			int mPreviousExposure;
-			int mPreviousZoom;
-			int mPreviousIso;
-			int mPreviousContrast;
-			int mPreviousSaturation;
-			int mPreviousSharpness;
-			int mPreviousWdr;
-			int mPreviousAntiShake;
-			int mPreviousFocus;
-			int mPreviousMetering;
-			int m_chk_dataline;
-			bool m_chk_dataline_end;
-			bool mAFState;
-			bool mCaptureFlag;
-			int mCamera_Mode;
-			int mCameraIndex;
-			int mPreviousPretty;
-			int mPreviousQuality;
-			int mYcbcrQuality;
-			bool mASDMode;
-			int mPreviewFrameSkipValue;
-
-            sp<MemoryHeapBase> mPreviewHeaps[MAX_CAMERA_BUFFERS];
-            sp<MemoryBase> mPreviewBuffers[MAX_CAMERA_BUFFERS];
-
+			bool    mRecordEnabled; 
+			bool 	mFalsePreview;
+			bool 	mRecorded;
+			bool 	mAutoFocusRunning;	
+			bool 	m_chk_dataline_end;
+			bool 	mAFState;
+			bool 	mCaptureFlag;
+			bool 	mASDMode;		
+			bool 	mSamsungCamera;		
+			int 	mPreviousWB;
+			int 	mPreviousEffect;
+			int 	mPreviousAntibanding;
+			int 	mPreviousSceneMode;
+			int 	mPreviousFlashMode;
+			int 	mPreviousBrightness;
+			int 	mPreviousExposure;
+			int 	mPreviousZoom;
+			int 	mPreviousIso;
+			int 	mPreviousContrast;
+			int 	mPreviousSaturation;
+			int 	mPreviousSharpness;
+			int 	mPreviousWdr;
+			int 	mPreviousAntiShake;
+			int 	mPreviousFocus;
+			int 	mPreviousMetering;
+			int 	m_chk_dataline;
+			int 	mCamera_Mode;
+			int 	mCameraIndex;
+			int 	mPreviousPretty;
+			int 	mPreviousQuality;
+			int 	mYcbcrQuality;
+			int 	mPreviewFrameSkipValue;
 			int32_t mCameraMode;
-			bool mSamsungCamera;		
-			int mCamMode;		
-			int mCounterSkipFrame;
-			int mSkipFrameNumber;
+			int 	mCamMode;		
+			int 	mCounterSkipFrame;
+			int 	mSkipFrameNumber;
+			int 	mPreviousFlag;
+			int 	m_touch_af_start_stop;
+			int 	m_focus_mode;
+			int 	m_iso;
+			int 	m_default_imei;
+			int 	mPreviewWidth;
+			int 	mPreviewHeight;
+#ifdef HALO_ISO
+			int 	mPreviousISO;
+#endif			
+#ifdef SAMSUNG_SECURITY
+			int 	m_cur_security;
+			int 	m_security;
 			unsigned int mPassedFirstFrame;
 			unsigned int mOldResetCount;
-			int mPreviousFlag;
-			int dequeue_from_dss_failed;	
-#ifdef HALO_ISO
-			int mPreviousISO;
-#endif
-			int mPreviewWidth;
-			int mPreviewHeight;
-#ifdef SAMSUNG_SECURITY
-			int m_cur_security;
-			int m_security;
 #endif
 
-			/*--------------Eclair Camera HAL---------------------*/
 #ifdef CAMERA_ALGO
 			struct timeval algo_before, algo_after;
 			int lastOverlayIndex;
@@ -644,25 +608,24 @@ namespace android {
 			int file_index;
 			int cmd;
 			int quality;
-			unsigned int sensor_width;
-			unsigned int sensor_height;
-			unsigned int zoom_width;
-			unsigned int zoom_height;
 			int mflash;
 			int mred_eye;
 			int mcapture_mode;
 			int mzoom;
 			int mcaf;
-			int j;
 			int myuv;
-			int mMMSApp;
+
+			unsigned int sensor_width;
+			unsigned int sensor_height;
+			unsigned int zoom_width;
+			unsigned int zoom_height;
 
 			NEON_fpo Neon_Rotate;
 			NEON_FUNCTION_ARGS* neon_args;
 			void* pTIrtn;
 
-			enum PreviewThreadCommands {
-
+			enum PreviewThreadCommands 
+			{
 				// Comands       
 				PREVIEW_START,
 				PREVIEW_STOP,
@@ -683,13 +646,12 @@ namespace android {
 				CAPTURE_NACK,
 			};
 
-			enum ProcessingThreadCommands {
-
+			enum ProcessingThreadCommands 
+			{
 				// Comands        
 				PROCESSING_PROCESS,
 				PROCESSING_CANCEL,
 				PROCESSING_KILL,
-
 				// ACKs        
 				PROCESSING_ACK,
 				PROCESSING_NACK,
@@ -704,6 +666,15 @@ namespace android {
 				COMMAND_TOUCH_AF_STARTSTOP 			= 1105,
 				COMMAND_CHECK_DATALINE 				= 1106,
 				COMMAND_DEFAULT_IMEI 				= 1107,
+			};
+			
+			enum AE_AWB_LOCK_UNLOCK
+			{
+				AE_UNLOCK_AWB_UNLOCK = 0,
+				AE_LOCK_AWB_UNLOCK,
+				AE_UNLOCK_AWB_LOCK,
+				AE_LOCK_AWB_LOCK,
+				AE_AWB_MAX
 			};
 
 			MessageQueue    previewThreadCommandQ;

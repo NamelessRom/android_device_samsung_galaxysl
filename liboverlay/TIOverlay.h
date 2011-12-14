@@ -24,7 +24,6 @@
 #include <hardware/overlay.h>
 #include "overlay_common.h"
 #include "v4l2_utils.h"
-#include "../include/videodev2.h"
 
 #define OVERLAY_DATA_MARKER  (0x68759746) // OVRLYSHM on phone keypad
 
@@ -58,20 +57,17 @@ public:
         alpha = 0;
         zorder = 3;
         panel = 0x0;
-        mirror = 0x0;
-
     };
 public:
   uint32_t posX;
   uint32_t posY;
   uint32_t posW;
   uint32_t posH;
-  int32_t colorkey;
+  uint32_t colorkey;
   uint32_t rotation;
   uint32_t alpha;
   uint32_t zorder;
   uint32_t panel;
-  uint32_t mirror;
 } ;
 
 class overlay_data_t {
@@ -81,10 +77,6 @@ public:
         cropY = 0;
         cropW = LCD_WIDTH;
         cropH = LCD_HEIGHT;
-        s3d_mode = OVERLAY_S3D_MODE_OFF;
-        s3d_fmt = OVERLAY_S3D_FORMAT_NONE;
-        s3d_order = OVERLAY_S3D_ORDER_LF;
-        s3d_subsampling = OVERLAY_S3D_SS_NONE;
     }
 
 public:
@@ -92,21 +84,16 @@ public:
   uint32_t cropY;
   uint32_t cropW;
   uint32_t cropH;
-  bool s3d_active;
-  uint32_t s3d_mode;
-  uint32_t s3d_fmt;
-  uint32_t s3d_order;
-  uint32_t s3d_subsampling;
 };
 
 
 // A separate instance of this class is created per overlay
 class overlay_object : public overlay_t {
 public:
+    // workaround for camera
+    uint32_t IsCamera; 
     handle_t mControlHandle;
     handle_t mDataHandle;
-    int mLinkVideoCtrlfd; //fd for the video device getting linked
-    int mLinkVideoDatafd; //fd for the video device getting linked
     uint32_t marker;
     volatile int32_t refCnt;
 
@@ -139,14 +126,15 @@ public:
     int attributes_changed;
 
     char overlaymanagerpath[PATH_MAX];
+    char overlayzorderpath[PATH_MAX];
     char overlayenabled[PATH_MAX];
 
-    struct displayMetaData {
-        int mPanelIndex;
-        int mManagerIndex;
-        int mTobeDisabledPanelIndex;
-        };
-    displayMetaData mDisplayMetaData;
+	struct displayMetaData {
+		int mPanelIndex;
+		int mManagerIndex;
+		int mTobeDisabledPanelIndex;
+		};
+	displayMetaData mDisplayMetaData;
     static overlay_handle_t getHandleRef(struct overlay_t* overlay) {
         /* returns a reference to the handle, caller doesn't take ownership */
         return &(static_cast<overlay_object *>(overlay)->mControlHandle);
@@ -167,8 +155,7 @@ public:
         this->h_stride = 0;
         this->format = format;
         this->num_buffers = numbuffers;
-        this->mLinkVideoCtrlfd = -1;
-        this->mLinkVideoDatafd = -1;
+
         memset( &mCtl, 0, sizeof( mCtl ) );
         memset( &mCtlStage, 0, sizeof( mCtlStage ) );
     }
@@ -177,11 +164,6 @@ public:
     int  getdata_videofd()const   { return mDataHandle.video_fd;}
     int  getctrl_ovlyobjfd()const {return mControlHandle.overlayobj_sharedfd;}
     int  getdata_ovlyobjfd()const {return mDataHandle.overlayobj_sharedfd;}
-
-    int  getctrl_linkvideofd()const {return mLinkVideoCtrlfd;}
-    int  getdata_linkvideofd()const {return mLinkVideoDatafd;}
-    void  setctrl_linkvideofd(int fd) {mLinkVideoCtrlfd = fd;}
-    void  setdata_linkvideofd(int fd) {mLinkVideoDatafd = fd;}
 
     int  getIndex() const    { return mControlHandle.overlayobj_index; }
     int  getsize() const    { return mControlHandle.overlayobj_size; }
@@ -198,9 +180,9 @@ public:
 
     static int overlay_get(struct overlay_control_device_t *dev, int name);
     static overlay_t* overlay_createOverlay(struct overlay_control_device_t *dev,
-            uint32_t w, uint32_t h, int32_t  format);
+            uint32_t w, uint32_t h, int32_t  format,int isS3D);
     static overlay_t* overlay_createOverlay(struct overlay_control_device_t *dev,
-            uint32_t w, uint32_t h, int32_t  format, int isS3D);
+                                            uint32_t w, uint32_t h, int32_t  format);
     static void overlay_destroyOverlay(struct overlay_control_device_t *dev,
                                        overlay_t* overlay);
     static int overlay_setPosition(struct overlay_control_device_t *dev,
@@ -217,8 +199,6 @@ public:
                               overlay_t* overlay);
     static int overlay_control_close(struct hw_device_t *dev);
 
-    static int overlay_requestOverlayClone(struct overlay_control_device_t* dev, overlay_t* overlay,int enable);
-
 public:
     /* this method has to index the correct overly object and map to the current process and
      * return the overlay object to the current data path.
@@ -227,11 +207,8 @@ public:
     static void destroy_shared_overlayobj(overlay_object *overlayobj, bool isCtrlpath = true);
     static overlay_object* open_shared_overlayobj(int ovlyfd, int ovlysize);
     static void close_shared_overlayobj(overlay_object *overlayobj);
-    static void calculateWindow(overlay_object *overlayobj, overlay_ctrl_t *finalWindow, int panelId, bool isCrtlpath = true);
-    static void calculateDisplayMetaData(overlay_object *overlayobj, int panelId);
-
-    //methods for link device
-     static int CommitLinkDevice(overlay_control_device_t *dev, overlay_object* overlayobj);
+	static void calculateWindow(overlay_object *overlayobj, overlay_ctrl_t *finalWindow);
+	static void calculateDisplayMetaData(overlay_object *overlayobj);
 
 public:
     /**
@@ -239,9 +216,6 @@ public:
      * with the assumption that only one of this class is created.
      */
     overlay_object* mOmapOverlays[MAX_NUM_OVERLAYS];
-
-    /* record zorder of each overlay */
-    int mZorderUsage[MAX_NUM_OVERLAYS];
 
 };
 
@@ -265,8 +239,6 @@ public:
                                    overlay_buffer_t buffer);
     static int overlay_getBufferCount(struct overlay_data_device_t *dev);
     static int overlay_data_close(struct hw_device_t *dev);
-    static int overlay_set_s3d_params(struct overlay_data_device_t *dev, uint32_t s3d_mode,
-                           uint32_t s3d_fmt, uint32_t s3d_order, uint32_t s3d_subsampling);
 
     /* our private state goes below here */
 public:

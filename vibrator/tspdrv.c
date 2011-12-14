@@ -64,6 +64,14 @@ int sendit(int timeout_ms)
         }
     }
 
+    /* waleedq : set PWM for i9003 to increase the power for vibetonz */
+    tspret = ioctl(tspd, VIBE_CHANGE_PWM, 750000);
+    if(tspret != 0) {
+      printf("VIBE_CHANGE_PWM error\n");
+    } else {
+      printf("VIBE_CHANGE_PWM success\n");
+    }
+
     fd = open(THE_DEVICE, O_RDWR);
     if(fd < 0)
         return errno;
