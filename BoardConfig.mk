@@ -9,14 +9,6 @@ TARGET_CPU_ABI2 := armeabi
 TARGET_ARCH_VARIANT := armv7-a-neon
 ARCH_ARM_HAVE_TLS_REGISTER := true
 
-TARGET_OMAP3 := true
-COMMON_GLOBAL_CFLAGS += -DTARGET_OMAP3
-OMAP_ENHANCEMENT := true
-
-ifdef OMAP_ENHANCEMENT
-COMMON_GLOBAL_CFLAGS += -DOMAP_ENHANCEMENT -DTARGET_OMAP3
-endif
-
 TARGET_NO_BOOTLOADER := true
 TARGET_NO_RADIOIMAGE := true
 
@@ -39,7 +31,8 @@ BOARD_BML_RECOVERY := /dev/block/bml7
 BOARD_USES_MMCUTILS := true
 BOARD_HAS_NO_MISC_PARTITION := true
 BOARD_HAS_NO_SELECT_BUTTON := true
-BOARD_CUSTOM_RECOVERY_KEYMAPPING:= ../../device/samsung/galaxysl/recovery/recovery_ui.c
+BOARD_CUSTOM_RECOVERY_KEYMAPPING := ../../device/samsung/galaxysl/recovery/recovery_keys.c
+BOARD_CUSTOM_GRAPHICS := ../../../device/samsung/galaxysl/recovery/graphics.c
 
 # fix this up by examining /proc/mtd on a running device
 BOARD_BOOTIMAGE_PARTITION_SIZE := 8388608
@@ -65,39 +58,27 @@ BOARD_HAVE_BLUETOOTH := true
 
 # Egl
 BOARD_EGL_CFG := device/samsung/galaxysl/egl.cfg
+COMMON_GLOBAL_CFLAGS += -DMISSING_GRALLOC_BUFFERS -DMISSING_EGL_PIXEL_FORMAT_YV12 -DMISSING_EGL_EXTERNAL_IMAGE
+
+# Touchscreen
+BOARD_USE_LEGACY_TOUCHSCREEN := true
 
 # Audio
 BOARD_USES_GENERIC_AUDIO := false
 BOARD_USES_ALSA_AUDIO := true
 BUILD_WITH_ALSA_UTILS := true
-#TARGET_PROVIDES_LIBAUDIO := true
+BOARD_USES_AUDIO_LEGACY := true
 
 # Camera
-USE_CAMERA_STUB := false
-BOARD_CAMERA_LIBRARIES := libcamera
-
-# Video
-HARDWARE_OMX := true
-ifdef HARDWARE_OMX
-OMX_JPEG := true
-OMX_VENDOR := ti
-OMX_VENDOR_INCLUDES := \
-   hardware/ti/omap3/omx/system/src/openmax_il/omx_core/inc \
-   hardware/ti/omap3/omx/image/src/openmax_il/jpeg_enc/inc \
-   external/libexif
-OMX_VENDOR_WRAPPER := TI_OMX_Wrapper
-BOARD_OPENCORE_LIBRARIES := libOMX_Core
-BOARD_OPENCORE_FLAGS := -DHARDWARE_OMX=1
-endif
-
-COMMON_GLOBAL_CFLAGS += -DOVERLAY_NUM_REQBUFFERS=6
+USE_CAMERA_STUB := true
+#BOARD_CAMERA_LIBRARIES := libcamera
 
 # Wifi related defines
 USES_TI_WL1271 := true
 BOARD_WPA_SUPPLICANT_DRIVER := CUSTOM
 BOARD_WPA_SUPPLICANT_PRIVATE_LIB := libCustomWifi
 BOARD_WLAN_DEVICE           := wl1271
-BOARD_SOFTAP_DEVICE         := wl1271
+#BOARD_SOFTAP_DEVICE         := wl1271 // missing libhostapdcli
 WPA_SUPPLICANT_VERSION      := VER_0_6_X
 WIFI_DRIVER_MODULE_PATH     := "/system/lib/modules/tiwlan_drv.ko"
 WIFI_DRIVER_MODULE_NAME     := "tiwlan_drv"

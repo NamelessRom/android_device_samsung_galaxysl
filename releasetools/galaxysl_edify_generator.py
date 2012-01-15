@@ -42,3 +42,12 @@ class EdifyGenerator(edify_generator.EdifyGenerator):
     def RunBackup(self, command):
       edify_generator.EdifyGenerator.RunBackup(self, command)
 
+    def BMLWriteRawImage(self, partition, image):
+      """Write the given package file into the given partition."""
+
+      args = {'partition': partition, 'image': image}
+
+      self.script.append(
+            ('assert(package_extract_file("%(image)s", "/tmp/%(image)s"),\n'
+             '       write_raw_image("/tmp/%(image)s", "%(partition)s"),\n'
+             '       delete("/tmp/%(image)s"));') % args)
