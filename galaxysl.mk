@@ -26,9 +26,11 @@ PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/init.rc:root/init.rc \
 	device/samsung/galaxysl/init.latona.rc:root/init.latona.rc \
 	device/samsung/galaxysl/lpm.rc:root/lpm.rc \
+        device/samsung/galaxysl/default.prop:root/default.prop \
 	device/samsung/galaxysl/lpm.rc:recovery/root/lpm.rc \
 	device/samsung/galaxysl/ueventd.latona.rc:root/ueventd.latona.rc \
-	device/samsung/galaxysl/ueventd.latona.rc:recovery/root/ueventd.latona.rc
+	device/samsung/galaxysl/ueventd.latona.rc:recovery/root/ueventd.latona.rc \
+        device/samsung/galaxysl/default.prop:recovery/root/default.prop
 
 # Configuration files for audio
 PRODUCT_COPY_FILES += \
@@ -118,7 +120,7 @@ PRODUCT_COPY_FILES += \
 # Packages
 PRODUCT_PACKAGES := \
     lights.latona \
-	com.android.future.usb.accessory \
+    com.android.future.usb.accessory \
     bdaddr_read \
     utility_make_ext4fs \
     bootmenu_busybox
