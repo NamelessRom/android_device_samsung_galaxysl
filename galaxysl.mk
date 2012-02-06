@@ -136,6 +136,7 @@ PRODUCT_PROPERTY_OVERRIDES := \
 PRODUCT_PROPERTY_OVERRIDES += \
        wifi.interface=tiwlan0 \
        wifi.supplicant_scan_interval=180 \
+       ro.telephony.ril_class=SamsungRIL \
        ro.telephony.ril.v3=icccardstatus,datacall,signalstrength,facilitylock \
        mobiledata.interfaces=pdp0,eth0,gprs,ppp0 \
        dalvik.vm.heapsize=64m \
