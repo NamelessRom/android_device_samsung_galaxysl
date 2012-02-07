@@ -4,8 +4,15 @@ on early-init
     export DSP_PATH /system/lib/dsp
     export DEFAULT_BASEIMAGE /system/lib/dsp/baseimage.dof
     export QOSDYN_FILE /system/lib/dsp/qosdyn_3430.dll64P
+    export EXTERNAL_STORAGE /mnt/sdcard
+    export PHONE_STORAGE /mnt/emmc
+
 
     mkdir /mnt/emmc 0000 system system
+    mkdir /mnt/sdcard 0000 system system
+
+    symlink /data/tmp /tmp
+    symlink /mnt/sdcard /sdcard
     symlink /mnt/emmc /emmc
 
     mkdir /efs 0771 system system
