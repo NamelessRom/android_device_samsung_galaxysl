@@ -96,6 +96,10 @@ PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/keylayout/sec_power_key.kl:system/usr/keylayout/sec_power_key.kl \
 	device/samsung/galaxysl/keylayout/sec_touchscreen.kl:system/usr/keylayout/sec_touchscreen.kl
 
+# IDC file for Touchscreen Calibration
+PRODUCT_COPY_FILES += \
+	device/samsung/galaxysl/sec_touchscreen.idc:system/usr/idc/sec_touchscreen.idc
+
 # These are the hardware-specific features
 PRODUCT_COPY_FILES += \
 	frameworks/base/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
