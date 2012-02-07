@@ -1,20 +1,21 @@
 import init.latona.usb.rc
 
 on early-init
+    export EXTERNAL_STORAGE /mnt/sdcard
+    export SECONDARY_STORAGE /mnt/emmc
+    export DOWNLOAD_CACHE /data/download
+
     export DSP_PATH /system/lib/dsp
     export DEFAULT_BASEIMAGE /system/lib/dsp/baseimage.dof
     export QOSDYN_FILE /system/lib/dsp/qosdyn_3430.dll64P
-    export EXTERNAL_STORAGE /mnt/sdcard
-    export PHONE_STORAGE /mnt/emmc
 
+    mkdir /mnt/sdcard 0000 system system
+    symlink /mnt/sdcard /sdcard
 
     mkdir /mnt/emmc 0000 system system
-    mkdir /mnt/sdcard 0000 system system
-
-    symlink /data/tmp /tmp
-    symlink /mnt/sdcard /sdcard
     symlink /mnt/emmc /emmc
 
+    mkdir /dbdata 0771 system system
     mkdir /efs 0771 system system
 
     # load kernel modules
@@ -37,6 +38,49 @@ on early-init
     write /proc/sys/kernel/sched_wakeup_granularity_ns 2000000
     write /proc/sys/kernel/sched_compat_yield 1
     write /proc/sys/kernel/sched_child_runs_first 0
+
+on fs
+    mount ext4 /dev/block/stl9 /system
+    #mount ext4 /dev/block/stl9 /system ro remount
+
+    mount ext4 /dev/block/stl11 /cache
+
+    mount ext4 /dev/block/mmcblk0p3 /data
+
+    # download cache
+    mkdir /data/download 0770 system cache
+
+    mount ext4 /dev/block/stl10 /dbdata
+    chown system system /dbdata
+    chmod 0771 /dbdata
+
+    #mkdir /dbdata/dalvik-cache 0771 system system
+    #chown system system /dbdata/dalvik-cache
+    #chmod 0771 /dbdata/dalvik-cache
+    #symlink /dbdata/dalvik-cache /cache/dalvik-cache
+
+    mkdir /efs 0775 radio radio
+    mount rfs /dev/block/stl3 /efs nosuid nodev check=no,iocharset=cp437
+    chown radio system /efs
+    chmod 0771 /efs
+    chmod 0771 /efs/bluetooth
+    chmod 0771 /efs/imei
+
+    # Vibetonz
+    export TMPDIR /data/local/tmp
+    symlink /data/local/tmp /tmp
+
+    # additional kernel modules
+    insmod /system/lib/modules/samsung_battery.ko
+    insmod /system/lib/modules/Si4709_driver.ko
+    insmod /system/lib/modules/yas_mag_kernel_driver.ko
+    insmod /system/lib/modules/yas_acc_kernel_driver.ko
+    insmod /system/lib/modules/yas_ori_kernel_driver.ko
+    insmod /system/lib/modules/gp2a.ko
+    insmod /system/lib/modules/gps.ko
+    insmod /system/lib/modules/storage.ko
+    insmod /system/lib/modules/vibetonz.ko
+    insmod /system/lib/modules/switch_sio.ko
 
 on post-fs-data
 # permission for dvfslock ctrl
@@ -128,31 +172,6 @@ on post-fs-data
     chmod 0660 /dev/video6
     chmod 0660 /dev/video10
 
-on boot
-    # to enable wifi - for TIWLAN
-    setprop wifi.interface "tiwlan0"
-
-   # permissions for MTP device node_temporary permission_will be changed 0660
-    chmod 0660 /dev/usb_mtp_gadget 
-    chown system system /dev/usb_mtp_gadget
-    
-    # Permission for USB and UART path
-     chown system radio /sys/devices/platform/switch-sio/uart_sel
-     chown system radio /sys/devices/platform/switch-sio/usb_sel        
-    
-    # USB Device permission
-    chown system system /sys/devices/platform/android_usb/UsbMenuSel
-    chown system system /sys/devices/platform/android_usb/tethering    
-    chown system system /sys/devices/platform/i2c_omap.1/i2c-1/1-0048/twl4030_usb/vbus
-
-    mount debugfs /sys/kernel/debug /sys/kernel/debug
-
-# fake some battery state
-    setprop status.battery.state Slow
-    setprop status.battery.level 5
-    setprop status.battery.level_raw  50
-    setprop status.battery.level_scale 9
-
 # wi-fi
     mkdir /data/misc/wifi/sockets 0770 wifi wifi
     mkdir /data/misc/dhcp 0770 dhcp dhcp
@@ -166,22 +185,6 @@ on boot
     chown gps system /data/gps
     chown gps root /sys/class/sec/gps/GPS_PWR_EN/value
     chmod 660 /sys/class/sec/gps/GPS_PWR_EN/value
-
-    # Enabling sleep in idle path
-    write /debug/pm_debug/sleep_while_idle 1
-
-    # Enabling Voltage OFF in idle path
-    write /debug/pm_debug/voltage_off_while_idle 1
-
-    # Enabling OFF mode
-    write /debug/pm_debug/enable_off_mode 1
-
-    # Enabling Smartreflex
-    write /debug/pm_debug/smartreflex/sr_mpu/autocomp 1 
-    write /debug/pm_debug/smartreflex/sr_core/autocomp 1 
-
-    # Setting scaling governor
-    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor conservative
 
     # change permissions for Sensors
     chown system system /sys/bus/i2c/drivers/cma3000_accl/4-001c
@@ -356,14 +359,55 @@ on boot
     write /sys/touchscreen/touch_boost 1
     
 # CM7 touchscreen fix (waleedq)
- 	write /sys/touchscreen/set_touchscreen 7032
- 	write /sys/touchscreen/set_noise 4027
- 	write /sys/touchscreen/set_acquisition 4000
- 	exec /system/bin/cat /sys/touchscreen/set_write
+    write /sys/touchscreen/set_touchscreen 7032
+    write /sys/touchscreen/set_noise 4027
+    write /sys/touchscreen/set_acquisition 4000
+    exec /system/bin/cat /sys/touchscreen/set_write
  	
 # permission for touchscreen
     chown system system /sys/touchscreen/bootcomplete
     chown system system /sys/touchscreen/set_qt_firm_update
+
+# permissions for MTP device node_temporary permission_will be changed 0660
+    chmod 0660 /dev/usb_mtp_gadget 
+    chown system system /dev/usb_mtp_gadget
+    
+# Permission for USB and UART path
+    chown system radio /sys/devices/platform/switch-sio/uart_sel
+    chown system radio /sys/devices/platform/switch-sio/usb_sel        
+    
+# USB Device permission
+    chown system system /sys/devices/platform/android_usb/UsbMenuSel
+    chown system system /sys/devices/platform/android_usb/tethering    
+    chown system system /sys/devices/platform/i2c_omap.1/i2c-1/1-0048/twl4030_usb/vbus
+
+    mount debugfs /sys/kernel/debug /sys/kernel/debug
+
+on boot
+    # to enable wifi - for TIWLAN
+    setprop wifi.interface "tiwlan0"
+
+# fake some battery state
+    setprop status.battery.state Slow
+    setprop status.battery.level 5
+    setprop status.battery.level_raw  50
+    setprop status.battery.level_scale 9
+
+    # Enabling sleep in idle path
+    write /debug/pm_debug/sleep_while_idle 1
+
+    # Enabling Voltage OFF in idle path
+    write /debug/pm_debug/voltage_off_while_idle 1
+
+    # Enabling OFF mode
+    write /debug/pm_debug/enable_off_mode 1
+
+    # Enabling Smartreflex
+    write /debug/pm_debug/smartreflex/sr_mpu/autocomp 1 
+    write /debug/pm_debug/smartreflex/sr_core/autocomp 1 
+
+    # Setting scaling governor
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor conservative
 
 # for datarouter
     chown system system /dev/ttyGS0
@@ -371,46 +415,6 @@ on boot
 
 # Increase readahead buffers on MMC devices
     write /sys/block/mmcblk0/bdi/read_ahead_kb 1024
-
-on fs
-    mount ext4 /dev/block/stl9 /system
-    #mount ext4 /dev/block/stl9 /system ro remount
-
-    mount ext4 /dev/block/stl11 /cache
-    mount ext4 /dev/block/mmcblk0p3 /data
-
-    mkdir /dbdata 0771 system system
-    mount ext4 /dev/block/stl10 /dbdata
-    chown system system /dbdata
-    chmod 0771 /dbdata
-
-    mkdir /dbdata/dalvik-cache 0771 system system
-    chown system system /dbdata/dalvik-cache
-    chmod 0771 /dbdata/dalvik-cache
-    symlink /dbdata/dalvik-cache /cache/dalvik-cache
-
-    mkdir /efs 0775 radio radio
-    mount rfs /dev/block/stl3 /efs nosuid nodev check=no,iocharset=cp437
-    chown radio system /efs
-    chmod 0771 /efs
-    chmod 0771 /efs/bluetooth
-    chmod 0771 /efs/imei
-
-    # Vibetonz
-    export TMPDIR /data/local/tmp
-    symlink /data/local/tmp /tmp
-
-    # additional kernel modules
-    insmod /system/lib/modules/samsung_battery.ko
-    insmod /system/lib/modules/Si4709_driver.ko
-    insmod /system/lib/modules/yas_mag_kernel_driver.ko
-    insmod /system/lib/modules/yas_acc_kernel_driver.ko
-    insmod /system/lib/modules/yas_ori_kernel_driver.ko
-    insmod /system/lib/modules/gp2a.ko
-    insmod /system/lib/modules/gps.ko
-    insmod /system/lib/modules/storage.ko
-    insmod /system/lib/modules/vibetonz.ko
-    insmod /system/lib/modules/switch_sio.ko
 
 # 3D init
 service pvrsrvinit /system/bin/pvrsrvinit
