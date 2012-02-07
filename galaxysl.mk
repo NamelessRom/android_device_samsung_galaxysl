@@ -150,7 +150,12 @@ PRODUCT_PROPERTY_OVERRIDES += \
         ro.com.google.networklocation=1
 
 # we have enough storage space to hold precise GC data
-PRODUCT_TAGS += dalvik.gc.type-precise
+PRODUCT_TAGS += \
+        dalvik.gc.type-precise
+
+# Our cache partition isn't big enough for dalvik-cache.
+PRODUCT_PROPERTY_OVERRIDES += \
+        dalvik.vm.dexopt-data-only=1
 
 # Screen density is actually considered a locale (since it is taken into account
 # the the build-time selection of resources). The product definitions including
