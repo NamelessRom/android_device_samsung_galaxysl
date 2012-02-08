@@ -21,24 +21,24 @@ export PATH=/:/sbin:/system/xbin:/system/bin:/tmp:$PATH
 /tmp/busybox mkdir -p /dbdata
 /tmp/busybox mkdir -p /efs
 
-# make sure sdcard is mounted
-if ! /tmp/busybox grep -q /sdcard /proc/mounts ; then
-    /tmp/busybox mkdir -p /sdcard
-    /tmp/busybox umount -l /dev/block/mmcblk1p1
-    if ! /tmp/busybox mount -t vfat /dev/block/mmcblk1p1 /sdcard ; then
-        /tmp/busybox echo "Cannot mount sdcard."
+# make sure internal sdcard is mounted
+if ! /tmp/busybox grep -q /emmc /proc/mounts ; then
+    /tmp/busybox mkdir -p /emmc
+    /tmp/busybox umount -l /dev/block/mmcblk0p1
+    if ! /tmp/busybox mount -t vfat /dev/block/mmcblk0p1 /emmc ; then
+        /tmp/busybox echo "Cannot mount internal sdcard."
         exit 1
     fi
 fi
 
 # remove old log
-rm -rf /sdcard/cyanogenmod.log
+rm -rf /emmc/cyanogenmod.log
 
-# everything is logged into /sdcard/cyanogenmod.log
-exec >> /sdcard/cyanogenmod.log 2>&1
+# everything is logged into /emmc/cyanogenmod.log
+exec >> /emmc/cyanogenmod.log 2>&1
 
 # efs backup
-if ! /tmp/busybox test -e /sdcard/backup/efs/nv_data.bin ; then
+if ! /tmp/busybox test -e /emmc/backup/efs/nv_data.bin ; then
 
     # make sure efs is mounted
     if ! /tmp/busybox grep -q /efs /proc/mounts ; then
@@ -48,16 +48,16 @@ if ! /tmp/busybox test -e /sdcard/backup/efs/nv_data.bin ; then
             /tmp/busybox echo "Cannot mount efs."
             exit 2
         fi
-    fi
+fi
 
     # create a backup of efs
-    if /tmp/busybox test -e /sdcard/backup/efs ; then
-        /tmp/busybox mv /sdcard/backup/efs /sdcard/backup/efs-$$
+    if /tmp/busybox test -e /emmc/backup/efs ; then
+        /tmp/busybox mv /emmc/backup/efs /emmc/backup/efs-$$
     fi
-    /tmp/busybox rm -rf /sdcard/backup/efs
+    /tmp/busybox rm -rf /emmc/backup/efs
     
-    /tmp/busybox mkdir -p /sdcard/backup/efs
-    /tmp/busybox cp -R /efs/ /sdcard/backup
+    /tmp/busybox mkdir -p /emmc/backup/efs
+    /tmp/busybox cp -R /efs/ /emmc/backup
 fi
 
 #
@@ -83,7 +83,7 @@ if ! /tmp/busybox mount -t ext4 /dev/block/stl11 /cache ; then
 fi
 
 # format data if not ext4
-if ! /tmp/busybox mount -t ext4 /dev/block/mmcblk0p3  /data ; then
+if ! /tmp/busybox mount -t ext4 /dev/block/mmcblk0p3 /data ; then
     /tmp/busybox umount /data
     /tmp/make_ext4fs -b 4096 -g 32768 -i 8192 -I 256 -a /data /dev/block/mmcblk0p3
 fi
