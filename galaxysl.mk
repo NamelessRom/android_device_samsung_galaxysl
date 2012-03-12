@@ -126,6 +126,12 @@ PRODUCT_PACKAGES := \
     utility_make_ext4fs \
     bootmenu_busybox
 
+# ICS sound
+PRODUCT_PACKAGES += \
+	hcitool hciattach hcidump \
+	libaudioutils audio.a2dp.default audio_policy.latona \
+	libaudiohw_legacy audio.primary.omap3
+
 # device specific overlays
 DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
 
