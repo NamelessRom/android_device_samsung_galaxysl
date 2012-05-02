@@ -21,6 +21,13 @@ PRODUCT_COPY_FILES := \
 	device/samsung/galaxysl/etc/vold.fstab:system/etc/vold.fstab \
 	device/samsung/galaxysl/egl.cfg:system/lib/egl/egl.cfg
 
+# Vold
+PRODUCT_PROPERTY_OVERRIDES := \
+	ro.vold.switchablepair=/mnt/emmc,/mnt/sdcard
+
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+	persist.sys.vold.switchexternal=1
+
 # Init files
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/init.latona.rc:root/init.latona.rc \
