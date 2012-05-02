@@ -131,7 +131,8 @@ PRODUCT_PACKAGES := \
     com.android.future.usb.accessory \
     bdaddr_read \
     utility_make_ext4fs \
-    bootmenu_busybox
+    bootmenu_busybox \
+    SamsungServiceMode
 
 # ICS sound
 PRODUCT_PACKAGES += \
