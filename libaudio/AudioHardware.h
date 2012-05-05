@@ -65,7 +65,7 @@ namespace android_audio_legacy {
 // Default audio input sample rate
 #define AUDIO_HW_IN_SAMPLERATE 44100
 // Default audio input channel mask
-#define AUDIO_HW_IN_CHANNELS (AudioSystem::CHANNEL_IN_MONO)
+#define AUDIO_HW_IN_CHANNELS 2
 // Default audio input sample format
 #define AUDIO_HW_IN_FORMAT (AudioSystem::PCM_16_BIT)
 // Kernel pcm in buffer size in frames at 44.1kHz (before resampling)
@@ -81,12 +81,6 @@ class AudioHardware : public AudioHardwareBase
     class AudioStreamInALSA;
 
 public:
-
-    // input path names used to translate from input sources to driver paths
-    static const char *inputPathNameDefault;
-    static const char *inputPathNameCamcorder;
-    static const char *inputPathNameVoiceRecognition;
-    static const char *inputPathNameVoiceCommunication;
 
     AudioHardware();
     virtual ~AudioHardware();

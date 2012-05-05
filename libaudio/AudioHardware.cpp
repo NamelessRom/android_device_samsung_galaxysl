@@ -53,7 +53,7 @@ const uint32_t AudioHardware::inputConfigTable[][AudioHardware::INPUT_CONFIG_CNT
         {16000, 2},
         {22050, 2},
         {32000, 1},
-        {44100, 1}
+        {44100, 2}
 };
 
 //  trace driver operations for dump
@@ -82,10 +82,7 @@ enum {
 
 // ----------------------------------------------------------------------------
 
-const char *AudioHardware::inputPathNameDefault = "Default";
-const char *AudioHardware::inputPathNameCamcorder = "Camcorder";
-const char *AudioHardware::inputPathNameVoiceRecognition = "Voice Recognition";
-const char *AudioHardware::inputPathNameVoiceCommunication = "Voice Communication";
+
 
 AudioHardware::AudioHardware() :
     mInit(false),
@@ -422,6 +419,7 @@ status_t AudioHardware::setMode(int mode)
                 if (ctl != NULL) {
                     LOGV("setMode() reset Playback Path to RCV");
                     TRACE_DRIVER_IN(DRV_MIXER_SEL)
+		    mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "Amp Enable"), "OFF");
                     mixer_ctl_set_enum_by_string(ctl, "RCV");
                     TRACE_DRIVER_OUT
                 }
@@ -808,13 +806,34 @@ status_t AudioHardware::setIncallPath_l(uint32_t device)
 
             if (mMixer != NULL) {
                 TRACE_DRIVER_IN(DRV_MIXER_GET)
-                struct mixer_ctl *ctl= mixer_get_ctl_by_name(mMixer, "Voice Call Path");
+                struct mixer_ctl *ctl = mixer_get_ctl_by_name(mMixer, "Voice Call Path");
                 TRACE_DRIVER_OUT
                 LOGE_IF(ctl == NULL, "setIncallPath_l() could not get mixer ctl");
                 if (ctl != NULL) {
                     LOGV("setIncallPath_l() Voice Call Path, (%x)", device);
                     TRACE_DRIVER_IN(DRV_MIXER_SEL)
-                    mixer_ctl_set_enum_by_string(ctl, getVoiceRouteFromDevice(device));
+		    const char *route = getVoiceRouteFromDevice(device);
+		    const char *max97000path;
+		    //Latona requires MAX97000 mixer ctl to enable sound output
+			bool mIsAmpEnable=true;
+	    		if(strcmp(route,"SPK")==0)
+				max97000path="INA -> SPK";
+	    		else if((strcmp(route,"3HP")==0)||(strcmp(route,"4HP")==0)){			
+				max97000path="INB -> HP";
+				mIsAmpEnable=false;
+	    		}else
+				// MAX97000 mixer ctl is not required
+				max97000path=NULL;
+
+			if(mIsAmpEnable)
+				mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "Amp Enable"), "OFF");
+
+			//Voice Call Path Mixer ctl
+			mixer_ctl_set_enum_by_string(ctl, route);
+
+			if(max97000path!=NULL)
+	    			mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "MAX97000 Output Mode"), max97000path);
+
                     TRACE_DRIVER_OUT
                 }
             }
@@ -842,7 +861,7 @@ void AudioHardware::enableFMRadio() {
         }
 
         if (mFmFd < 0) {
-            mFmFd = open("/dev/radio0", O_RDWR);
+            mFmFd = open("/dev/fmradio", O_RDWR);
             // In case setFmVolume was called before FM was enabled, we save the volume and call it here.
             setFmVolume(mFmVolume);
         }
@@ -895,23 +914,17 @@ status_t AudioHardware::setFMRadioPath_l(uint32_t device)
     switch(device){
          case AudioSystem::DEVICE_OUT_SPEAKER:
             LOGD("setFMRadioPath_l() fmradio speaker route");
-            fmpath = "FMR_SPK";
-            break;
-
-        case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO:
-        case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
-        case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_CARKIT:
-            LOGD("setFMRadioPath_l() fmradio bluetooth route");
+            fmpath = "SPK";
             break;
 
         case AudioSystem::DEVICE_OUT_WIRED_HEADSET:
         case AudioSystem::DEVICE_OUT_WIRED_HEADPHONE:
             LOGD("setFMRadioPath_l() fmradio headphone route");
-            fmpath = "FMR_HP";
+            fmpath = "HP";
             break;
         default:
             LOGE("setFMRadioPath_l() fmradio error, route = [%d]", device);
-            fmpath = "FMR_HP";
+            fmpath = "HP";
             break;
     }
 
@@ -925,6 +938,15 @@ status_t AudioHardware::setFMRadioPath_l(uint32_t device)
             LOGV("setFMRadioPath_l() FM Radio Path, (%s)", fmpath);
             TRACE_DRIVER_IN(DRV_MIXER_SEL)
             mixer_ctl_select(ctl, fmpath);
+	    //Latona requires MAX97000 mixer ctl to enable sound output
+	    if(strcmp(fmpath,"SPK")==0)
+			fmpath="INA -> SPK";
+	    else if(strcmp(fmpath,"HP")==0)
+			fmpath="INB -> HP";
+	    else
+			fmpath="INB -> HP";
+	    ctl = mixer_get_ctl_by_name(mMixer, "MAX97000 Output Mode");
+	    mixer_ctl_set_enum_by_string(ctl, fmpath);
             TRACE_DRIVER_OUT
         } else {
             LOGE("setFMRadioPath_l() could not get FM Radio Path mixer ctl");
@@ -935,10 +957,23 @@ status_t AudioHardware::setFMRadioPath_l(uint32_t device)
         TRACE_DRIVER_OUT
 
         const char *route = getOutputRouteFromDevice(device);
+	const char *max97000path;
         LOGV("setFMRadioPath_l() Playpack Path, (%s)", route);
         if (ctl) {
             TRACE_DRIVER_IN(DRV_MIXER_SEL)
+	    mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "Amp Enable"), "OFF");
             mixer_ctl_select(ctl, route);
+	    //Latona requires MAX97000 mixer ctl to enable sound output
+	    if(strcmp(route,"SPK")==0)
+			max97000path="INA -> SPK";
+	    else if(strcmp(route,"HP")==0)
+			max97000path="INB -> HP";
+	    else
+			max97000path=NULL;
+	    
+	    if(max97000path!=NULL)
+	    	mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "MAX97000 Output Mode"), max97000path);
+
             TRACE_DRIVER_OUT
         }
         else {
@@ -947,7 +982,7 @@ status_t AudioHardware::setFMRadioPath_l(uint32_t device)
     } else {
         LOGE("setFMRadioPath_l() mixer is not open");
     }
-
+	
     return NO_ERROR;
 }
 #endif
@@ -1035,6 +1070,11 @@ void AudioHardware::closeMixer_l()
     }
 
     if (--mMixerOpenCnt == 0) {
+	//Set TWL4030 to Idle Mode before closing Mixer
+	struct mixer_ctl *ctl = mixer_get_ctl_by_name(mMixer, "Amp Enable");
+	mixer_ctl_set_enum_by_string(ctl, "OFF");
+	ctl= mixer_get_ctl_by_name(mMixer, "Idle Mode");
+	mixer_ctl_set_enum_by_string(ctl, "off");
         TRACE_DRIVER_IN(DRV_MIXER_CLOSE)
         mixer_close(mMixer);
         TRACE_DRIVER_OUT
@@ -1048,24 +1088,19 @@ const char *AudioHardware::getOutputRouteFromDevice(uint32_t device)
     case AudioSystem::DEVICE_OUT_EARPIECE:
         return "RCV";
     case AudioSystem::DEVICE_OUT_SPEAKER:
-        if (mMode == AudioSystem::MODE_RINGTONE) return "RING_SPK";
-        else return "SPK";
+        return "SPK";
     case AudioSystem::DEVICE_OUT_WIRED_HEADPHONE:
-        if (mMode == AudioSystem::MODE_RINGTONE) return "RING_NO_MIC";
-        else return "HP_NO_MIC";
     case AudioSystem::DEVICE_OUT_WIRED_HEADSET:
-        if (mMode == AudioSystem::MODE_RINGTONE) return "RING_HP";
-        else return "HP";
+        return "HP";
     case (AudioSystem::DEVICE_OUT_SPEAKER|AudioSystem::DEVICE_OUT_WIRED_HEADPHONE):
     case (AudioSystem::DEVICE_OUT_SPEAKER|AudioSystem::DEVICE_OUT_WIRED_HEADSET):
-        if (mMode == AudioSystem::MODE_RINGTONE) return "RING_SPK_HP";
-        else return "SPK_HP";
+       return "SPK_HP";
     case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO:
     case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_HEADSET:
     case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_CARKIT:
         return "BT";
     default:
-        return "OFF";
+        return "off";
     }
 }
 
@@ -1088,9 +1123,9 @@ const char *AudioHardware::getVoiceRouteFromDevice(uint32_t device)
         case TTY_MODE_OFF:
         default:
             if (device == AudioSystem::DEVICE_OUT_WIRED_HEADPHONE) {
-                return "HP_NO_MIC";
+                return "3HP";
             } else {
-                return "HP";
+                return "4HP";
             }
         }
     case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO:
@@ -1098,23 +1133,23 @@ const char *AudioHardware::getVoiceRouteFromDevice(uint32_t device)
     case AudioSystem::DEVICE_OUT_BLUETOOTH_SCO_CARKIT:
         return "BT";
     default:
-        return "OFF";
+        return "off";
     }
 }
 
 const char *AudioHardware::getInputRouteFromDevice(uint32_t device)
 {
     if (mMicMute) {
-        return "MIC OFF";
+        return "off";
     }
 
     switch (device) {
     case AudioSystem::DEVICE_IN_BUILTIN_MIC:
-        return "Main Mic";
+        return "MAIN";
     case AudioSystem::DEVICE_IN_WIRED_HEADSET:
-        return "Hands Free Mic";
+        return "HP";
     case AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET:
-        return "BT Sco Mic";
+        return "BT";
 #ifdef HAVE_FM_RADIO
     case AudioSystem::DEVICE_IN_FM_RX:
         return "FM Radio";
@@ -1122,7 +1157,7 @@ const char *AudioHardware::getInputRouteFromDevice(uint32_t device)
         return "FM Radio A2DP";
 #endif
     default:
-        return "MIC OFF";
+        return "off";
     }
 }
 
@@ -1164,28 +1199,18 @@ status_t AudioHardware::setInputSource_l(audio_source source)
      if (source != mInputSource) {
          if ((source == AUDIO_SOURCE_DEFAULT) || (mMode != AudioSystem::MODE_IN_CALL)) {
              if (mMixer) {
-                 TRACE_DRIVER_IN(DRV_MIXER_GET)
-                 struct mixer_ctl *ctl= mixer_get_ctl_by_name(mMixer, "Input Source");
-                 TRACE_DRIVER_OUT
-                 if (ctl == NULL) {
-                     return NO_INIT;
-                 }
+		 struct mixer_ctl *ctl;
                  const char* sourceName;
                  switch (source) {
-                     case AUDIO_SOURCE_DEFAULT: // intended fall-through
-                     case AUDIO_SOURCE_MIC:
-                     case AUDIO_SOURCE_CAMCORDER:
-                         sourceName = inputPathNameCamcorder;
-                         break;
                      case AUDIO_SOURCE_VOICE_COMMUNICATION:
-                         sourceName = inputPathNameVoiceCommunication;
-                         break;
                      case AUDIO_SOURCE_VOICE_RECOGNITION:
-                         sourceName = inputPathNameVoiceRecognition;
-                         break;
-                     case AUDIO_SOURCE_VOICE_UPLINK:   // intended fall-through
-                     case AUDIO_SOURCE_VOICE_DOWNLINK: // intended fall-through
-                     case AUDIO_SOURCE_VOICE_CALL:     // intended fall-through
+                        sourceName = "on";
+                                          TRACE_DRIVER_IN(DRV_MIXER_GET)
+                 	ctl= mixer_get_ctl_by_name(mMixer, "VR Mode");
+                 	TRACE_DRIVER_OUT
+                 	if (ctl == NULL) {
+                     		return NO_INIT;
+                 	}
                      default:
                          return NO_INIT;
                  }
@@ -1480,10 +1505,31 @@ status_t AudioHardware::AudioStreamOutALSA::open_l()
     }
     if (mHardware->mode() != AudioSystem::MODE_IN_CALL) {
         const char *route = mHardware->getOutputRouteFromDevice(mDevices);
+	const char *max97000path;
         LOGV("write() wakeup setting route %s", route);
         if (mRouteCtl) {
             TRACE_DRIVER_IN(DRV_MIXER_SEL)
+	    //Latona requires MAX97000 mixer ctl to enable sound output
+	    bool mIsAmpEnable=true;
+	    if(strcmp(route,"SPK")==0){
+			max97000path="INA -> SPK";
+			mIsAmpEnable=false;
+	    }else if(strcmp(route,"HP")==0)
+			max97000path="INB -> HP";
+	    else if(strcmp(route,"SPK_HP")==0)
+			max97000path="INA + INB -> SPK and HP";
+	    else
+			max97000path=NULL;
+   
+	    if(mIsAmpEnable)
+		mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "Amp Enable"), "OFF");
+
+	    //Playback Path Mixer ctl
             mixer_ctl_set_enum_by_string(mRouteCtl, route);
+
+	    if(max97000path!=NULL)
+	    	mixer_ctl_set_enum_by_string(mixer_get_ctl_by_name(mMixer, "MAX97000 Output Mode"), max97000path);
+
             TRACE_DRIVER_OUT
         }
     }
@@ -1637,7 +1683,7 @@ void AudioHardware::AudioStreamOutALSA::removeEchoReference(struct echo_referenc
 
 AudioHardware::AudioStreamInALSA::AudioStreamInALSA() :
     mHardware(0), mPcm(0), mMixer(0), mRouteCtl(0),
-    mStandby(true), mDevices(0), mChannels(AUDIO_HW_IN_CHANNELS), mChannelCount(1),
+    mStandby(true), mDevices(0), mChannels(AUDIO_HW_IN_CHANNELS), mChannelCount(2),
     mSampleRate(AUDIO_HW_IN_SAMPLERATE), mBufferSize(AUDIO_HW_IN_PERIOD_BYTES),
     mDownSampler(NULL), mReadStatus(NO_ERROR), mInputBuf(NULL),
     mDriverOp(DRV_NONE), mStandbyCnt(0), mSleepReq(false),
@@ -1671,7 +1717,7 @@ status_t AudioHardware::AudioStreamInALSA::set(
 
     mHardware = hw;
 
-    LOGV("AudioStreamInALSA::set(%d, %d, %u)", *pFormat, *pChannels, *pRate);
+    LOGD("AudioStreamInALSA::set(%d, %d, %u)", *pFormat, *pChannels, *pRate);
 
     mBufferSize = getBufferSize(*pRate, AudioSystem::popCount(*pChannels));
     mDevices = devices;
@@ -2119,14 +2165,14 @@ status_t AudioHardware::AudioStreamInALSA::open_l()
     unsigned flags = PCM_IN;
 
     struct pcm_config config = {
-        channels : mChannelCount,
-        rate : AUDIO_HW_IN_SAMPLERATE,
-        period_size : AUDIO_HW_IN_PERIOD_SZ,
-        period_count : AUDIO_HW_IN_PERIOD_CNT,
-        format : PCM_FORMAT_S16_LE,
-        start_threshold : 0,
-        stop_threshold : 0,
-        silence_threshold : 0,
+            channels : AUDIO_HW_IN_CHANNELS,
+    	    rate : AUDIO_HW_IN_SAMPLERATE,
+            period_size : AUDIO_HW_IN_PERIOD_SZ,
+            period_count : AUDIO_HW_IN_PERIOD_CNT,
+            format : PCM_FORMAT_S16_LE,  
+            start_threshold : 0,
+            stop_threshold : 0,
+            silence_threshold : 0,   
     };
 
     LOGV("open pcm_in driver");
@@ -2155,7 +2201,7 @@ status_t AudioHardware::AudioStreamInALSA::open_l()
     mMixer = mHardware->openMixer_l();
     if (mMixer) {
         TRACE_DRIVER_IN(DRV_MIXER_GET)
-        mRouteCtl = mixer_get_ctl_by_name(mMixer, "Capture MIC Path");
+        mRouteCtl = mixer_get_ctl_by_name(mMixer, "Memo Path");
         TRACE_DRIVER_OUT
     }
 
