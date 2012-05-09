@@ -53,7 +53,7 @@ const uint32_t AudioHardware::inputConfigTable[][AudioHardware::INPUT_CONFIG_CNT
         {16000, 2},
         {22050, 2},
         {32000, 1},
-        {44100, 2}
+        {44100, 1}
 };
 
 //  trace driver operations for dump
@@ -1038,6 +1038,24 @@ void AudioHardware::closePcmOut_l()
         TRACE_DRIVER_OUT
         mPcm = NULL;
     }
+
+	setIdleMode();
+}
+
+void AudioHardware::setIdleMode()
+{
+	//Set TWL4030 to Idle Mode after closing the PCM Device
+	if((mMode != AudioSystem::MODE_IN_CALL) && (mMixerOpenCnt==0))
+	{
+        	openMixer_l();
+
+		struct mixer_ctl *ctl = mixer_get_ctl_by_name(mMixer, "Amp Enable");
+		mixer_ctl_set_enum_by_string(ctl, "OFF");
+		ctl= mixer_get_ctl_by_name(mMixer, "Idle Mode");
+		mixer_ctl_set_enum_by_string(ctl, "off");
+
+        	closeMixer_l();
+	}
 }
 
 struct mixer *AudioHardware::openMixer_l()
@@ -1070,11 +1088,6 @@ void AudioHardware::closeMixer_l()
     }
 
     if (--mMixerOpenCnt == 0) {
-	//Set TWL4030 to Idle Mode before closing Mixer
-	struct mixer_ctl *ctl = mixer_get_ctl_by_name(mMixer, "Amp Enable");
-	mixer_ctl_set_enum_by_string(ctl, "OFF");
-	ctl= mixer_get_ctl_by_name(mMixer, "Idle Mode");
-	mixer_ctl_set_enum_by_string(ctl, "off");
         TRACE_DRIVER_IN(DRV_MIXER_CLOSE)
         mixer_close(mMixer);
         TRACE_DRIVER_OUT

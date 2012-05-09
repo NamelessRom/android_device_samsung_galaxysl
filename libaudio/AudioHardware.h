@@ -139,6 +139,7 @@ public:
 
            struct pcm *openPcmOut_l();
            void closePcmOut_l();
+           void setIdleMode();
 
            struct mixer *openMixer_l();
            void closeMixer_l();
