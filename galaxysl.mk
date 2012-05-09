@@ -140,6 +140,9 @@ PRODUCT_PACKAGES += \
 	libaudioutils audio.a2dp.default audio_policy.latona \
 	libaudiohw_legacy audio.primary.omap3
 
+# HWComposer
+PRODUCT_PACKAGES += hwcomposer.default
+
 # device specific overlays
 DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
 
