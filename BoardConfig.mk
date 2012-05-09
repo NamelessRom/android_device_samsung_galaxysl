@@ -73,8 +73,7 @@ BOARD_GLOBAL_CFLAGS += -DHAVE_FM_RADIO
 BOARD_FM_DEVICE := si4709
 
 # Camera
-USE_CAMERA_STUB := true
-#BOARD_CAMERA_LIBRARIES := libcamera
+BOARD_CAMERA_LIBRARIES := libcamera
 
 # Wifi related defines
 USES_TI_WL1271 := true

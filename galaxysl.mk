@@ -143,6 +143,9 @@ PRODUCT_PACKAGES += \
 # HWComposer
 PRODUCT_PACKAGES += hwcomposer.default
 
+#Camera
+PRODUCT_PACKAGES += camera.latona
+
 # device specific overlays
 DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
 
