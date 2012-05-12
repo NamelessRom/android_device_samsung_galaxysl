@@ -1722,11 +1722,8 @@ status_t AudioHardware::AudioStreamInALSA::set(
         return BAD_VALUE;
     }
 
-    if (pChannels == 0 || (*pChannels != AudioSystem::CHANNEL_IN_MONO &&
-        *pChannels != AudioSystem::CHANNEL_IN_STEREO)) {
-        *pChannels = AUDIO_HW_IN_CHANNELS;
-        return BAD_VALUE;
-    }
+    //Workaround for MIC issues on Latona - Force Channels to STEREO
+    *pChannels = AUDIO_HW_IN_CHANNELS;
 
     mHardware = hw;
 
@@ -1736,6 +1733,7 @@ status_t AudioHardware::AudioStreamInALSA::set(
     mDevices = devices;
     mChannels = *pChannels;
     mChannelCount = AudioSystem::popCount(mChannels);
+
     mSampleRate = rate;
     if (mSampleRate != AUDIO_HW_OUT_SAMPLERATE) {
         mBufferProvider.mProvider.get_next_buffer = getNextBufferStatic;
@@ -2178,8 +2176,8 @@ status_t AudioHardware::AudioStreamInALSA::open_l()
     unsigned flags = PCM_IN;
 
     struct pcm_config config = {
-            channels : AUDIO_HW_IN_CHANNELS,
-    	    rate : AUDIO_HW_IN_SAMPLERATE,
+            channels : mChannelCount,
+            rate : AUDIO_HW_IN_SAMPLERATE,
             period_size : AUDIO_HW_IN_PERIOD_SZ,
             period_count : AUDIO_HW_IN_PERIOD_CNT,
             format : PCM_FORMAT_S16_LE,  
