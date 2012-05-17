@@ -2163,6 +2163,8 @@ void AudioHardware::AudioStreamInALSA::close_l()
         mPcm = NULL;
     }
 
+    mHardware->setIdleMode();
+
     delete[] mProcBuf;
     mProcBuf = NULL;
     mProcBufSize = 0;
