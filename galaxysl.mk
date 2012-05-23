@@ -21,13 +21,6 @@ PRODUCT_COPY_FILES := \
 	device/samsung/galaxysl/etc/vold.fstab:system/etc/vold.fstab \
 	device/samsung/galaxysl/egl.cfg:system/lib/egl/egl.cfg
 
-# Vold
-PRODUCT_PROPERTY_OVERRIDES := \
-	ro.vold.switchablepair=/mnt/emmc,/mnt/sdcard
-
-PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
-	persist.sys.vold.switchexternal=1
-
 # Init files
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/init.latona.rc:root/init.latona.rc \
@@ -164,7 +157,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
        ro.telephony.ril_class=SamsungRIL \
        ro.telephony.ril.v3=icccardstatus,datacall,signalstrength,facilitylock \
        mobiledata.interfaces=pdp0,eth0,gprs,ppp0 \
-       dalvik.vm.heapsize=64m \
        persist.service.usb.setting=0 \
        dev.sfbootcomplete=0
 
@@ -181,6 +173,27 @@ PRODUCT_TAGS += \
 # Our cache partition isn't big enough for dalvik-cache.
 PRODUCT_PROPERTY_OVERRIDES += \
         dalvik.vm.dexopt-data-only=1
+
+# Extended JNI checks
+# The extended JNI checks will cause the system to run more slowly, but they can spot a variety of nasty bugs
+# before they have a chance to cause problems.
+# Default=true for development builds, set by android buildsystem.
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.kernel.android.checkjni=0 \
+    dalvik.vm.checkjni=false
+
+# Override /proc/sys/vm/dirty_ratio on UMS
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.vold.umsdirtyratio=20
+
+# Vold
+PRODUCT_PROPERTY_OVERRIDES := \
+	ro.vold.switchablepair=/mnt/emmc,/mnt/sdcard
+
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+	persist.sys.vold.switchexternal=1
+
+include frameworks/base/build/phone-hdpi-512-dalvik-heap.mk
 
 # Screen density is actually considered a locale (since it is taken into account
 # the the build-time selection of resources). The product definitions including
