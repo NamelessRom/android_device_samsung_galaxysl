@@ -9,5 +9,6 @@ public class Startup extends BroadcastReceiver {
     @Override
     public void onReceive(final Context context, final Intent bootintent) {
         Hspa.restore(context);
+        VibrationIntensity.restore(context);
     }
 }

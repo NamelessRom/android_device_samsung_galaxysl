@@ -130,6 +130,9 @@ on post-fs-data
 
     chown system system /sys/class/backlight/omap_bl/brightness
 
+#Permission for Vibration Intensity Setting
+    chown system system /sys/vibetonz/pwmvalue_intensity
+
 # change permissions for Camera
     chown system camera /dev/video5
     chown system camera /dev/video0

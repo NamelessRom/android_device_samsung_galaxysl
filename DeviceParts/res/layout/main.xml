@@ -12,4 +12,14 @@ android:entries="@array/hspa_entries"
             android:entryValues="@array/hspa_entries_values"
             android:defaultValue="23" />
 </PreferenceCategory>
+<!-- Vibration Intensity settings -->
+<PreferenceCategory
+        android:title="@string/category_vibration_title">
+<com.cyanogenmod.settings.device.VibrationIntensity android:key="vibration_intensity"
+        android:title="@string/vibration_intensity_title"
+        android:summary="@string/vibration_intensity_summary"
+        android:defaultValue="6"
+        android:max="6"
+        />
+</PreferenceCategory>
 </PreferenceScreen>
