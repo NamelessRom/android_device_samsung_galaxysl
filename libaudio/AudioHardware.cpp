@@ -1530,7 +1530,7 @@ status_t AudioHardware::AudioStreamOutALSA::open_l()
 	    }else if(strcmp(route,"HP")==0)
 			max97000path="INB -> HP";
 	    else if(strcmp(route,"SPK_HP")==0)
-			max97000path="INA + INB -> SPK and HP";
+			max97000path="INB -> SPK and HP";
 	    else
 			max97000path=NULL;
    
