@@ -9,10 +9,8 @@ LOCAL_SRC_FILES:= \
         converter.cpp \
 	ExifCreator.cpp \
 
-LOCAL_C_INCLUDES += $(LOCAL_PATH)/../include
-
 LOCAL_C_INCLUDES += \
-    $(LOCAL_PATH)/inc/ \
+    $(LOCAL_PATH)/../include/ \
     frameworks/base/include/ui \
     frameworks/base/include/utils \
     frameworks/base/include/media/stagefright \

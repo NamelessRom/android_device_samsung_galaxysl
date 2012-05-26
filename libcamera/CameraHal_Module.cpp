@@ -34,6 +34,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <utils/Log.h>
+#include <videodev2.h>
 #include "binder/MemoryBase.h"
 #include "binder/MemoryHeapBase.h"
 #include <camera/CameraParameters.h>

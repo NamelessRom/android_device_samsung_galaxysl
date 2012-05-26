@@ -33,6 +33,7 @@
 #include "v4l2-mediabus.h"
 #include "v4l2-subdev.h"
 
+#include <videodev2.h>
 #define LOG_FUNCTION_START    LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
 #define LOG_FUNCTION_EXIT    LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
 
@@ -103,7 +104,7 @@ public:
     int getSceneMode();
     int setFocusMode(int focus_mode);
     int setAEAWBLockUnlock(int ae_lockunlock, int awb_lockunlock);
-    int SetCameraFlip();
+    int SetCameraFlip(bool isCapture);
 	int GetJpegImageSize();
 	int GetThumbNailOffset();
 	int GetYUVOffset();
@@ -130,7 +131,7 @@ public:
     void * GrabPreviewFrame ();
     void ReleasePreviewFrame ();
     void GrabRawFrame(void *previewBuffer, unsigned int width, unsigned int height);
-    camera_memory_t* GrabJpegFrame (camera_request_memory mRequestMemory,unsigned long& mfilesize);
+    camera_memory_t* GrabJpegFrame (camera_request_memory mRequestMemory,unsigned long& mfilesize,bool IsFrontCam);
     camera_memory_t* CreateJpegFromBuffer(void *rawBuffer, camera_request_memory mRequestMemory);
     unsigned long savePicture(unsigned char *inputBuffer, unsigned char *& output);
     void convert(unsigned char *buf, unsigned char *rgb, int width, int height);

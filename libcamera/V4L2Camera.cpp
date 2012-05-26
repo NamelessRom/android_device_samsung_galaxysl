@@ -771,7 +771,7 @@ V4L2Camera::savePicture(unsigned char *inputBuffer, unsigned char *& output)
     return fileSize;
 }
 
-camera_memory_t* V4L2Camera::GrabJpegFrame (camera_request_memory mRequestMemory,unsigned long& mfilesize)
+camera_memory_t* V4L2Camera::GrabJpegFrame (camera_request_memory mRequestMemory,unsigned long& mfilesize,bool IsFrontCam)
 {
     unsigned char * outputBuffer;
     unsigned long fileSize=0;
@@ -782,6 +782,7 @@ camera_memory_t* V4L2Camera::GrabJpegFrame (camera_request_memory mRequestMemory
     videoIn->buf.memory = V4L2_MEMORY_MMAP;
 
     do{
+	        LOGD("GrabJpegFrame - Dequeue buffer");
 		/* Dequeue buffer */
 		ret = ioctl(camHandle, VIDIOC_DQBUF, &videoIn->buf);
 		if (ret < 0) {
@@ -790,7 +791,14 @@ camera_memory_t* V4L2Camera::GrabJpegFrame (camera_request_memory mRequestMemory
 		}
 		nDequeued++;
 
-		fileSize = savePicture((unsigned char *)videoIn->mem[videoIn->buf.index], outputBuffer);
+		//Latona Front Camera doesn't support Image Processing. Manually Encode the JPEG
+		if(IsFrontCam)		
+		{	
+			LOGD("YUVU Format - savePicture");
+			fileSize = savePicture((unsigned char *)videoIn->mem[videoIn->buf.index], outputBuffer);
+		}
+
+		LOGD("GrabJpegFrame - Enqueue buffer");
 
 		/* Enqueue buffer */
 		ret = ioctl(camHandle, VIDIOC_QBUF, &videoIn->buf);
@@ -800,12 +808,20 @@ camera_memory_t* V4L2Camera::GrabJpegFrame (camera_request_memory mRequestMemory
 		}
 		nQueued++;
 
-		picture = mRequestMemory(-1,fileSize,1,NULL);
-		picture->data=outputBuffer;
+		if(IsFrontCam)
+		{	
+			picture = mRequestMemory(-1,fileSize,1,NULL);
+			picture->data=outputBuffer;
+    			mfilesize=fileSize;
+		}else{
+			fileSize=GetJpegImageSize();
+			picture = mRequestMemory(-1,fileSize,1,NULL);
+			picture->data=(unsigned char *)videoIn->mem[videoIn->buf.index];
+			mfilesize=fileSize;
+		}
 		break;
     }while(0);
 
-    mfilesize=fileSize;
     return picture;
 }
 
@@ -1249,11 +1265,14 @@ int V4L2Camera::setAEAWBLockUnlock(int ae_lockunlock, int awb_lockunlock)
 
 		return 0;
 }
-int V4L2Camera::SetCameraFlip()
+int V4L2Camera::SetCameraFlip(bool isCapture)
 {
                 struct v4l2_control vc;
                 vc.id = V4L2_CID_FLIP;
-                vc.value = CAMERA_FLIP_MIRROR;
+		if(isCapture)
+                	vc.value = CAMERA_FLIP_NONE;
+		else
+                	vc.value = CAMERA_FLIP_MIRROR;
                 if (ioctl (camHandle, VIDIOC_S_CTRL, &vc) < 0) {
                     LOGE("V4L2_CID_FLIP fail!\n");
                     return UNKNOWN_ERROR;

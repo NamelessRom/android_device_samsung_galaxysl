@@ -534,6 +534,8 @@ status_t CameraHardware::startPreview()
         return INVALID_OPERATION;
     }
 	
+	if(mCameraID==CAMERA_FF)	
+		fps=15;
 	ret = mCamera->Configure(mPreviewWidth,mPreviewHeight,PIXEL_FORMAT,fps,0);
     	if(ret < 0) {
 	    	LOGE("Fail to configure camera device");
@@ -541,7 +543,7 @@ status_t CameraHardware::startPreview()
     }
    //dhiru1602 : Set FFC Flip
    if(mCameraID==CAMERA_FF)
-   	mCamera->SetCameraFlip();
+   	mCamera->SetCameraFlip(false);
    /* clear previously buffers*/
     if(mPreviewHeap != NULL) {
         LOGD("mPreviewHeap Cleaning!!!!");
@@ -786,13 +788,21 @@ int CameraHardware::pictureThread()
      int width, height;
      mParameters.getPictureSize(&width, &height);
      int fps = mParameters.getPreviewFrameRate();
+     int pixelformat=V4L2_PIX_FMT_JPEG;
 
-
-    ret = mCamera->Configure(width,height,PIXEL_FORMAT,fps,1);
+    if(mCameraID==CAMERA_FF)
+    {
+	fps=15;
+	pixelformat=PIXEL_FORMAT;
+    }
+    ret = mCamera->Configure(width,height,pixelformat,fps,1);
     	if(ret < 0) {
 	    	LOGE("Fail to configure camera device");
 	    	return INVALID_OPERATION;
     }
+   //dhiru1602 : Set FFC Flip
+   if(mCameraID==CAMERA_FF)
+   	mCamera->SetCameraFlip(true);
 
      ret = mCamera->BufferMap(1);
      if (ret) {
@@ -819,8 +829,12 @@ int CameraHardware::pictureThread()
 
      //TODO xxx : Optimize the memory capture call. Too many memcpy
      if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
+        LOGD ("mJpegPictureCallback");
 	unsigned long JpegImageSize;
-        picture = mCamera->GrabJpegFrame(mRequestMemory,JpegImageSize);
+	if(mCameraID==CAMERA_FF)
+        	picture = mCamera->GrabJpegFrame(mRequestMemory,JpegImageSize,true);
+	else
+		picture = mCamera->GrabJpegFrame(mRequestMemory,JpegImageSize,false);
 	unsigned char* pExifBuf = new unsigned char[65536];
 	int JpegExifSize;
 
@@ -844,13 +858,13 @@ int CameraHardware::pictureThread()
     mCamera->Uninit(1);
     mCamera->StopStreaming();
 
-    LOGV ("End pictureThread()");
+    LOGD ("End pictureThread()");
     return NO_ERROR;
 }
 
 status_t CameraHardware::takePicture()
 {
-    LOGV("pictureThread()");
+    LOGD("pictureThread()");
     stopPreview();
     if (mPictureThread->run("CameraPictureThread", PRIORITY_DEFAULT) != NO_ERROR) {
         LOGE("%s : couldn't run picture thread", __func__);
