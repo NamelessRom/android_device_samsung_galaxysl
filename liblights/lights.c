@@ -38,6 +38,8 @@
 static pthread_once_t g_init = PTHREAD_ONCE_INIT;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
+int isNotificationMode=0;
+
 char const*const LCD_FILE
         = "/sys/class/backlight/omap_bl/brightness";
 
@@ -95,6 +97,15 @@ set_light_backlight(struct light_device_t* dev,
 
     pthread_mutex_lock(&g_lock);
     err = write_int(LCD_FILE, brightness);
+    if(!isNotificationMode)
+    {
+    	if(brightness==0) //If display is OFF
+    	{
+    		err = write_int(BUTTON_FILE, 0);
+    	}else{
+		err = write_int(BUTTON_FILE, 255);
+    	}
+    }
     pthread_mutex_unlock(&g_lock);
 
     return err;
@@ -114,10 +125,15 @@ set_light_buttons(struct light_device_t* dev,
     int err = 0;
     int on = is_lit(state);
 
-    LOGD("set_light_button on=%d\n", on ? 255 : 0);
-    pthread_mutex_lock(&g_lock);
-    err = write_int(BUTTON_FILE, on ? 255:0);
-    pthread_mutex_unlock(&g_lock);
+    if(!isNotificationMode)
+    {
+	LOGD("set_light_button on=%d\n", on ? 255 : 0);
+	pthread_mutex_lock(&g_lock);
+	err = write_int(BUTTON_FILE, on ? 255:0);
+	pthread_mutex_unlock(&g_lock);
+    }else{
+	LOGD("set_light_button - notification active");
+    }
 
     return err;
 }
@@ -155,6 +171,18 @@ set_light_notification(struct light_device_t* dev,
     LOGD("set_light_notification on=%d\n", v);
     err = write_int(BUTTON_FILE, v);
     pthread_mutex_unlock(&g_lock);
+    
+    //Since we are using the same LEDs for Notification and Button, we use a Notification FLAG
+    if(v == 0)
+    {
+	//Theoretically, the screen is ON when notifications are cleared, Re-enable Button LED.        
+	pthread_mutex_lock(&g_lock);
+        err = write_int(BUTTON_FILE, 255);
+        pthread_mutex_unlock(&g_lock);
+	isNotificationMode=0;
+    }else{
+	isNotificationMode=1;
+    }
 
     return err;
 }
