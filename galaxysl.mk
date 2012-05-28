@@ -24,6 +24,7 @@ PRODUCT_COPY_FILES := \
 # Init files
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/init.latona.rc:root/init.latona.rc \
+	device/samsung/galaxysl/init.latona.usb.rc:root/init.latona.usb.rc \
 	device/samsung/galaxysl/lpm.rc:root/lpm.rc \
 	device/samsung/galaxysl/lpm.rc:recovery/root/lpm.rc \
 	device/samsung/galaxysl/ueventd.latona.rc:root/ueventd.latona.rc \
@@ -157,8 +158,12 @@ PRODUCT_PROPERTY_OVERRIDES += \
        ro.telephony.ril_class=SamsungRIL \
        ro.telephony.ril.v3=icccardstatus,datacall,signalstrength,facilitylock \
        mobiledata.interfaces=pdp0,eth0,gprs,ppp0 \
-       persist.service.usb.setting=0 \
        dev.sfbootcomplete=0
+
+
+# Set default USB interface
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    persist.sys.usb.config=mass_storage
 
 # enable Google-specific location features,
 # like NetworkLocationProvider and LocationCollector
