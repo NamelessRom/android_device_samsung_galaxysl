@@ -18,6 +18,8 @@ on early-init
     mkdir /dbdata 0771 system system
     mkdir /efs 0771 system system
 
+    mkdir /debug 0771 system system
+
     # load kernel modules
     insmod /lib/modules/fsr.ko
     insmod /lib/modules/fsr_stl.ko
@@ -69,6 +71,9 @@ on fs
     # Vibetonz
     export TMPDIR /data/local/tmp
     symlink /data/local/tmp /tmp
+
+    mount debugfs /sys/kernel/debug /sys/kernel/debug
+    symlink /sys/kernel/debug /debug
 
     # additional kernel modules
     insmod /system/lib/modules/samsung_battery.ko
@@ -383,8 +388,6 @@ on post-fs-data
     chown system system /sys/devices/platform/android_usb/UsbMenuSel
     chown system system /sys/devices/platform/android_usb/tethering    
     chown system system /sys/devices/platform/i2c_omap.1/i2c-1/1-0048/twl4030_usb/vbus
-
-    mount debugfs /sys/kernel/debug /sys/kernel/debug
 
 on boot
     # to enable wifi - for TIWLAN
