@@ -187,7 +187,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.vold.umsdirtyratio=20
 
 # Vold
-PRODUCT_PROPERTY_OVERRIDES := \
+PRODUCT_PROPERTY_OVERRIDES += \
 	ro.vold.switchablepair=/mnt/emmc,/mnt/sdcard
 
 PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
