@@ -18,7 +18,8 @@ on early-init
     mkdir /dbdata 0771 system system
     mkdir /efs 0771 system system
 
-    mkdir /debug 0771 system system
+    mkdir /debug
+    mount debugfs /sys/kernel/debug /sys/kernel/debug
 
     # load kernel modules
     insmod /lib/modules/fsr.ko
@@ -72,8 +73,7 @@ on fs
     export TMPDIR /data/local/tmp
     symlink /data/local/tmp /tmp
 
-    mount debugfs /sys/kernel/debug /sys/kernel/debug
-    symlink /sys/kernel/debug /debug
+    mount debugfs debugfs /debug
 
     # additional kernel modules
     insmod /system/lib/modules/samsung_battery.ko
