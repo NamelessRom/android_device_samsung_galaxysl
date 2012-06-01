@@ -10,5 +10,6 @@ public class Startup extends BroadcastReceiver {
     public void onReceive(final Context context, final Intent bootintent) {
         Hspa.restore(context);
         VibrationIntensity.restore(context);
+        TouchKeyBacklightTimeout.restore(context);
     }
 }

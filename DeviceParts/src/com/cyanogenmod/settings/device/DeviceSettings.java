@@ -7,8 +7,10 @@ import android.preference.PreferenceActivity;
 public class DeviceSettings extends PreferenceActivity {
 
     public static final String KEY_HSPA = "hspa";
+    public static final String KEY_BACKLIGHT_TIMEOUT = "backlight_timeout";
 
     private ListPreference mHspa;
+    private ListPreference mBacklightTimeout;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -18,7 +20,10 @@ public class DeviceSettings extends PreferenceActivity {
         mHspa = (ListPreference) findPreference(KEY_HSPA);
         mHspa.setEnabled(Hspa.isSupported());
         mHspa.setOnPreferenceChangeListener(new Hspa(this));
-
+        
+        mBacklightTimeout = (ListPreference) findPreference(KEY_BACKLIGHT_TIMEOUT);
+        mBacklightTimeout.setEnabled(TouchKeyBacklightTimeout.isSupported());
+        mBacklightTimeout.setOnPreferenceChangeListener(new TouchKeyBacklightTimeout());
 
     }
 
