@@ -1096,8 +1096,7 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
             }
 
             if (0 <= new_focus_mode) {
-		//Temporary Focus Mode Setting
-                if (mCamera->setFocusMode(1) < 0) {
+                if (mCamera->setFocusMode(new_focus_mode) < 0) {
                     LOGE("%s::mCamera->setFocusMode(%d) fail", __func__, new_focus_mode);
                     ret = UNKNOWN_ERROR;
                 } else {
