@@ -391,21 +391,18 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
 void CameraHardware::enableMsgType(int32_t msgType)
 {
 	LOGD("enableMsgType:%d",msgType);
-    Mutex::Autolock lock(mLock);
     mMsgEnabled |= msgType;
 }
 
 void CameraHardware::disableMsgType(int32_t msgType)
 {
 	LOGD("disableMsgType:%d",msgType);
-    Mutex::Autolock lock(mLock);
     mMsgEnabled &= ~msgType;
 }
 
 bool CameraHardware::msgTypeEnabled(int32_t msgType)
 {
 	LOGD("msgTypeEnabled:%d",msgType);
-    Mutex::Autolock lock(mLock);
     return (mMsgEnabled & msgType);
 }
 
@@ -890,7 +887,6 @@ status_t CameraHardware::dump(int fd, const Vector<String16>& args) const
 
 status_t CameraHardware::setParameters(const CameraParameters& params)
 {
-    Mutex::Autolock lock(mLock);
 	int width  = 0;
 	int height = 0;
 	int framerate = 0;
@@ -1156,7 +1152,6 @@ CameraParameters CameraHardware::getParameters() const
     CameraParameters params;
 
     {
-        Mutex::Autolock lock(mLock);
         params = mParameters;
     }
 
@@ -1171,7 +1166,9 @@ status_t CameraHardware::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
 void CameraHardware::release()
 {
     if (mPreviewThread != NULL) {
+	mLock.lock();
         mPreviewThread->requestExit();
+	mLock.unlock();
         mPreviewThread->requestExitAndWait();
         mPreviewThread.clear();
     }
