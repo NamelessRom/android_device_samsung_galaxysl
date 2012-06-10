@@ -1126,7 +1126,7 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
                 mParameters.set(CameraParameters::KEY_ZOOM, new_zoom);
             }
 	}
-    
+}
 	// rotation
     int new_rotation = params.getInt(CameraParameters::KEY_ROTATION);
     if (0 <= new_rotation) {
@@ -1139,11 +1139,7 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
         }
     }
 
-
-
-
-}
-    return NO_ERROR;
+return NO_ERROR;
 }
 
 CameraParameters CameraHardware::getParameters() const
