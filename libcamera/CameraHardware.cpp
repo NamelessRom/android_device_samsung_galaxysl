@@ -220,11 +220,9 @@ void CameraHardware::initDefaultParameters(int CameraID)
         		parameterString.append(CameraParameters::SCENE_MODE_PARTY);
         		parameterString.append(",");
         		parameterString.append(CameraParameters::SCENE_MODE_CANDLELIGHT);
-        		// TODO: CE147 doesn't understand scene mode
-        		//p.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,
-        		//      parameterString.string());
-        		p.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,"auto,portrait,landscpae,night,beach,snow,sunset,fireworks,sports,party,candlelight");
-			}
+        		p.set(CameraParameters::KEY_SUPPORTED_SCENE_MODES,
+        		      parameterString.string());
+		}
 		p.set(CameraParameters::KEY_SCENE_MODE, CameraParameters::SCENE_MODE_AUTO);
 		parameterString = CameraParameters::EFFECT_NONE;
     	parameterString.append(",");
