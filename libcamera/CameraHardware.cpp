@@ -55,6 +55,7 @@
 #define BACK_CAMERA_MACRO_FOCUS_DISTANCES_STR "0.10,0.20,Infinity"
 #define BACK_CAMERA_INFINITY_FOCUS_DISTANCES_STR "0.10,1.20,Infinity"
 #define FRONT_CAMERA_FOCUS_DISTANCES_STR "0.20,0.25,Infinity"
+const char FOCUS_MODE_FACEDETECTION[] = "facedetect";
 
 #include <cutils/properties.h>
 #ifndef UNLIKELY
@@ -165,10 +166,10 @@ void CameraHardware::initDefaultParameters(int CameraID)
 
     		        parameterString = CameraParameters::FOCUS_MODE_AUTO;
         		parameterString.append(",");
-        		parameterString.append(CameraParameters::FOCUS_MODE_INFINITY);
-        		parameterString.append(",");
         		parameterString.append(CameraParameters::FOCUS_MODE_MACRO);
-        		p.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,
+			parameterString.append(",");
+		        parameterString.append(FOCUS_MODE_FACEDETECTION);
+			p.set(CameraParameters::KEY_SUPPORTED_FOCUS_MODES,
               		parameterString.string());
 
         		p.set(CameraParameters::KEY_FOCUS_MODE,
@@ -1084,11 +1085,10 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
                 mParameters.set(CameraParameters::KEY_FOCUS_DISTANCES,
                                 BACK_CAMERA_MACRO_FOCUS_DISTANCES_STR);
             }
-            else if (!strcmp(new_focus_mode_str,
-                           (const char *)  CameraParameters::FOCUS_MODE_INFINITY)) {
-                new_focus_mode = FOCUS_MODE_INFINITY;
+            else if (!strcmp(new_focus_mode_str,FOCUS_MODE_FACEDETECTION)) {
+                new_focus_mode = FOCUS_MODE_FACEDETECT;
                 mParameters.set(CameraParameters::KEY_FOCUS_DISTANCES,
-                                BACK_CAMERA_INFINITY_FOCUS_DISTANCES_STR);
+                                BACK_CAMERA_AUTO_FOCUS_DISTANCES_STR);
             }
             else {
                 LOGE("%s::unmatched focus_mode(%s)", __func__, new_focus_mode_str);
