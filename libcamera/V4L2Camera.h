@@ -152,6 +152,7 @@ private:
     int mSharpness;
     int mSaturation;
     int mBrightness;
+    int mAutofocusRunning;
 
     int nQueued;
     int nDequeued;

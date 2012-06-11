@@ -95,6 +95,7 @@ V4L2Camera::V4L2Camera ()
     mSharpness=4;
     mSaturation=4;
     mBrightness=5;
+    mAutofocusRunning=0;
 
 #ifdef _OMAP_RESIZER_
 	videoIn->resizeHandle = -1;
@@ -1098,6 +1099,8 @@ int V4L2Camera::setAutofocus(void)
         return -1;
     }
 
+    mAutofocusRunning=1;
+
     return 0;
 }
 
@@ -1122,6 +1125,7 @@ int V4L2Camera::getAutoFocusResult(void)
     LOGV("%s : AF was successful, returning %d", __func__, af_result);
 
 finish_auto_focus:
+    mAutofocusRunning=0;
     return af_result;
 }
 
@@ -1134,9 +1138,14 @@ int V4L2Camera::cancelAutofocus(void)
         return -1;
     }
 
-    if (v4l2_s_ctrl(camHandle, V4L2_CID_AF, AF_STOP) < 0) {
-        LOGE("ERR(%s):Fail on V4L2_CID_CAMERA_SET_AUTO_FOCUS", __func__);
-        return -1;
+    /* AF_STOP restores the sensor focus state to default. Hence,
+       we only use AF_STOP only when Autofocus is currently running */
+    if(mAutofocusRunning)
+    {
+    	if (v4l2_s_ctrl(camHandle, V4L2_CID_AF, AF_STOP) < 0) {
+        	LOGE("ERR(%s):Fail on V4L2_CID_CAMERA_SET_AUTO_FOCUS", __func__);
+        	return -1;
+    	}
     }
 
     return 0;
