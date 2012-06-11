@@ -70,7 +70,7 @@ namespace android {
 const char CameraHardware::supportedPictureSizes_ffc [] = "640x480";
 const char CameraHardware::supportedPictureSizes_bfc [] = "2560x1920,2560x1536,2048x1536,2048x1232,1600x1200,1600x960,800x480,640x480";
 const char CameraHardware::supportedPreviewSizes_ffc [] = "640x480,320x240,176x144";
-const char CameraHardware::supportedPreviewSizes_bfc [] = "800x480,720x480,640x480,352x288";
+const char CameraHardware::supportedPreviewSizes_bfc [] = "1280x720,800x480,720x480,640x480,352x288";
 
 CameraHardware::CameraHardware(int CameraID)
                   : mParameters(),
