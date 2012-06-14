@@ -392,19 +392,19 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
 
 void CameraHardware::enableMsgType(int32_t msgType)
 {
-	LOGD("enableMsgType:%d",msgType);
+	LOGV("enableMsgType:%d",msgType);
     mMsgEnabled |= msgType;
 }
 
 void CameraHardware::disableMsgType(int32_t msgType)
 {
-	LOGD("disableMsgType:%d",msgType);
+	LOGV("disableMsgType:%d",msgType);
     mMsgEnabled &= ~msgType;
 }
 
 bool CameraHardware::msgTypeEnabled(int32_t msgType)
 {
-	LOGD("msgTypeEnabled:%d",msgType);
+	LOGV("msgTypeEnabled:%d",msgType);
     return (mMsgEnabled & msgType);
 }
 
@@ -606,18 +606,18 @@ void CameraHardware::stopPreview()
     /* don't hold the lock while waiting for the thread to quit */
 	if (previewThread != 0) {
 		previewThread->requestExitAndWait();
-		LOGD("previewThread->requestExitAndWait();");
+		LOGV("previewThread->requestExitAndWait();");
 	}
 
     if (mPreviewThread != 0) {
         mCamera->Uninit(0);
         mCamera->StopStreaming();
-	LOGD(" mCamera->StopStreaming();");
+	LOGV(" mCamera->StopStreaming();");
     }
 
     Mutex::Autolock lock(mPreviewLock);
     mPreviewThread.clear();
-	LOGD("return");
+	LOGV("return");
     return;
 }
 
@@ -668,7 +668,7 @@ void CameraHardware::releaseRecordingFrame(const void* opaque)
 int CameraHardware::beginAutoFocusThread(void *cookie)
 {
     CameraHardware *c = (CameraHardware *)cookie;
-    LOGD("beginAutoFocusThread");
+    LOGV("beginAutoFocusThread");
     return c->autoFocusThread();
 }
 
@@ -828,7 +828,7 @@ int CameraHardware::pictureThread()
 
      //TODO xxx : Optimize the memory capture call. Too many memcpy
      if (mMsgEnabled & CAMERA_MSG_COMPRESSED_IMAGE) {
-        LOGD ("mJpegPictureCallback");
+        LOGV ("mJpegPictureCallback");
 	unsigned long JpegImageSize;
 	if(mCameraID==CAMERA_FF)
         	picture = mCamera->GrabJpegFrame(mRequestMemory,JpegImageSize,true);
@@ -857,13 +857,13 @@ int CameraHardware::pictureThread()
     mCamera->Uninit(1);
     mCamera->StopStreaming();
 
-    LOGD ("End pictureThread()");
+    LOGV ("End pictureThread()");
     return NO_ERROR;
 }
 
 status_t CameraHardware::takePicture()
 {
-    LOGD("pictureThread()");
+    LOGV("pictureThread()");
     stopPreview();
     if (mPictureThread->run("CameraPictureThread", PRIORITY_DEFAULT) != NO_ERROR) {
         LOGE("%s : couldn't run picture thread", __func__);
@@ -895,9 +895,9 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
 	int ret;
 	params.getPreviewSize(&width,&height);
 
-	LOGD("Set Parameter...!! ");
+	LOGV("Set Parameter...!! ");
 
-	LOGD("PreviewFormat %s", params.getPreviewFormat());
+	LOGV("PreviewFormat %s", params.getPreviewFormat());
 	if ( params.getPreviewFormat() != NULL ) {
 		if (strcmp(params.getPreviewFormat(), (const char *) CameraParameters::PIXEL_FORMAT_YUV420SP) != 0) {
 			LOGE("Only YUV420SP preview is supported");
@@ -905,7 +905,7 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
 		}
 	}
 
-	LOGD("PictureFormat %s", params.getPictureFormat());
+	LOGV("PictureFormat %s", params.getPictureFormat());
 	if ( params.getPictureFormat() != NULL ) {
 		if (strcmp(params.getPictureFormat(), (const char *) CameraParameters::PIXEL_FORMAT_JPEG) != 0) {
 			LOGE("Only jpeg still pictures are supported");
@@ -915,16 +915,16 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
 
 
     framerate = params.getPreviewFrameRate();
-    LOGD("FRAMERATE %d", framerate);
+    LOGV("FRAMERATE %d", framerate);
 
     mParameters = params;
 
     mParameters.getPictureSize(&width, &height);
-    LOGD("Picture Size by CamHAL %d x %d", width, height);
+    LOGV("Picture Size by CamHAL %d x %d", width, height);
 
 
     mParameters.getPreviewSize(&width, &height);
-    LOGD("Preview Resolution by CamHAL %d x %d", width, height);
+    LOGV("Preview Resolution by CamHAL %d x %d", width, height);
     mParameters.setPreviewSize(width, height);
 
 

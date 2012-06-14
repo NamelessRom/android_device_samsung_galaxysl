@@ -120,22 +120,18 @@ void camera_set_callbacks(struct camera_device * device,
 void camera_enable_msg_type(struct camera_device * device, int32_t msg_type)
 {
     V4l2_camera_device_t* V4l2_dev = NULL;
-
-    LOG_FUNCTION_NAME
     V4L2CameraHardware->enableMsgType(msg_type);
 }
 
 void camera_disable_msg_type(struct camera_device * device, int32_t msg_type)
 {
     V4l2_camera_device_t* V4l2_dev = NULL;
-    LOG_FUNCTION_NAME
     V4L2CameraHardware->disableMsgType(msg_type);
 }
 
 int camera_msg_type_enabled(struct camera_device * device, int32_t msg_type)
 {
     V4l2_camera_device_t* V4l2_dev = NULL;
-    LOG_FUNCTION_NAME
     return V4L2CameraHardware->msgTypeEnabled(msg_type);
 }
 
