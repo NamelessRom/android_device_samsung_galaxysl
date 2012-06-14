@@ -492,7 +492,7 @@ int CameraHardware::previewThread()
                     (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)) {
 
                     camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
-                    y422_to_yuv420((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
+                    Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
 
 
                     if ((mMsgEnabled & CAMERA_MSG_VIDEO_FRAME ) &&
