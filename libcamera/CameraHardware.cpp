@@ -374,9 +374,6 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
                 width,
                 height,
                 HAL_PIXEL_FORMAT_YV12);
-
-    if(mCameraID==CAMERA_FF)
-    	mNativeWindow->set_crop(mNativeWindow,0,0,360,480); //TODO: Requires calibration
     err = mNativeWindow->set_buffer_count(mNativeWindow, 3);
     if (err != 0) {
         LOGE("native_window_set_buffer_count failed: %s (%d)", strerror(-err), -err);
