@@ -141,6 +141,9 @@ PRODUCT_PACKAGES += hwcomposer.default
 #Camera
 PRODUCT_PACKAGES += camera.latona
 
+# OMX stuff
+PRODUCT_PACKAGES += dspexec libOMX_Core
+
 # device specific overlays
 DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
 
