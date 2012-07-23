@@ -485,20 +485,21 @@ int CameraHardware::previewThread()
 
                 mNativeWindow->enqueue_buffer(mNativeWindow,(buffer_handle_t*) hndl2hndl);
 
-                if ((mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) ||
-                    (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME)) {
+                if ((mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
 
                     camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
                     Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
-
-
+		    mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
+                }
                     if ((mMsgEnabled & CAMERA_MSG_VIDEO_FRAME ) &&
                          mRecordingEnabled ) {
+			Mutex::Autolock lock(mRecordingLock);
                         nsecs_t timeStamp = systemTime(SYSTEM_TIME_MONOTONIC);
-                        //mTimestampFn(timeStamp, CAMERA_MSG_VIDEO_FRAME,mRecordBuffer, mUser);
-                    }
-                    mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
-		}
+		        camera_memory_t* recorder = mRequestMemory(-1, framesize, 1, NULL);
+                        memcpy(recorder->data,tempbuf,framesize);
+			mDataCb(CAMERA_MSG_VIDEO_FRAME,recorder,0,NULL,mCallbackCookie);
+                        mDataCbTimestamp(timeStamp, CAMERA_MSG_VIDEO_FRAME,recorder, 0, mCallbackCookie);
+                   }
                 mCamera->ReleasePreviewFrame();
             }
 
