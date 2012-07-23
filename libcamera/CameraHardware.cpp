@@ -84,7 +84,8 @@ CameraHardware::CameraHardware(int CameraID)
                     mDataCbTimestamp(0),
                     mCallbackCookie(0),
                     mMsgEnabled(0),
-                    previewStopped(true)
+                    previewStopped(true),
+                    mRecordingEnabled(false)
 {
 	/* create camera */
 	mCamera = new V4L2Camera();
@@ -650,7 +651,7 @@ void CameraHardware::stopRecording()
 
 bool CameraHardware::recordingEnabled()
 {
-    return mRecordingEnabled == true;
+    return mRecordingEnabled;
 }
 
 void CameraHardware::releaseRecordingFrame(const void* opaque)
