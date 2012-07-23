@@ -19,6 +19,7 @@
 */
 
 #include "converter.h"
+#include <stdint.h>
 extern int version;
 
 #ifndef KERNEL_VERSION
@@ -27,119 +28,36 @@ extern int version;
 
 void y422_to_yuv420(unsigned char *bufsrc, unsigned char *bufdest, int width, int height)
 {
-    unsigned char *ptrsrcy1, *ptrsrcy2;
-    unsigned char *ptrsrcy3, *ptrsrcy4;
-    unsigned char *ptrsrccb1, *ptrsrccb2;
-    unsigned char *ptrsrccb3, *ptrsrccb4;
-    unsigned char *ptrsrccr1, *ptrsrccr2;
-    unsigned char *ptrsrccr3, *ptrsrccr4;
-    int srcystride, srcccstride;
+        int i, j;
+        uint8_t *src = (uint8_t *)bufsrc;
+        uint8_t *src1 = src;
+        uint8_t *dst_y = (uint8_t *)bufdest;
+        uint8_t *dst_u, *dst_v;
 
-    ptrsrcy1  = bufsrc + 1;
-    ptrsrcy2  = bufsrc + (width<<1) + 1;
-    ptrsrcy3  = bufsrc + (width<<1)*2 + 1;
-    ptrsrcy4  = bufsrc + (width<<1)*3 + 1;
-
-    ptrsrccb1 = bufsrc + 2;
-    ptrsrccb2 = bufsrc + (width<<1) + 2;
-    ptrsrccb3 = bufsrc + (width<<1)*2 + 2;
-    ptrsrccb4 = bufsrc + (width<<1)*3 + 2;
-
-    ptrsrccr1 = bufsrc;
-    ptrsrccr2 = bufsrc + (width<<1);
-    ptrsrccr3 = bufsrc + (width<<1)*2;
-    ptrsrccr4 = bufsrc + (width<<1)*3;
-
-    srcystride  = (width<<1)*3;
-    srcccstride = (width<<1)*3;
-
-    unsigned char *ptrdesty1, *ptrdesty2;
-    unsigned char *ptrdesty3, *ptrdesty4;
-    unsigned char *ptrdestcb1, *ptrdestcb2;
-    unsigned char *ptrdestcr1, *ptrdestcr2;
-    int destystride, destccstride;
-
-    ptrdesty1 = bufdest;
-    ptrdesty2 = bufdest + width;
-    ptrdesty3 = bufdest + width*2;
-    ptrdesty4 = bufdest + width*3;
-
-    ptrdestcb1 = bufdest + width*height;
-    ptrdestcb2 = bufdest + width*height + (width>>1);
-
-    ptrdestcr1 = bufdest + width*height + ((width*height) >> 2);
-    ptrdestcr2 = bufdest + width*height + ((width*height) >> 2) + (width>>1);
-
-    destystride  = (width)*3;
-    destccstride = (width>>1);
-
-    int i, j;
-
-    for(j=0; j<(height/4); j++)
-    {
-        for(i=0;i<(width/2);i++)
-        {
-            (*ptrdesty1++) = (*ptrsrcy1);
-            (*ptrdesty2++) = (*ptrsrcy2);
-            (*ptrdesty3++) = (*ptrsrcy3);
-            (*ptrdesty4++) = (*ptrsrcy4);
-
-            ptrsrcy1 += 2;
-            ptrsrcy2 += 2;
-            ptrsrcy3 += 2;
-            ptrsrcy4 += 2;
-
-            (*ptrdesty1++) = (*ptrsrcy1);
-            (*ptrdesty2++) = (*ptrsrcy2);
-            (*ptrdesty3++) = (*ptrsrcy3);
-            (*ptrdesty4++) = (*ptrsrcy4);
-
-            ptrsrcy1 += 2;
-            ptrsrcy2 += 2;
-            ptrsrcy3 += 2;
-            ptrsrcy4 += 2;
-
-            (*ptrdestcb1++) = (*ptrsrccb1);
-            (*ptrdestcb2++) = (*ptrsrccb3);
-
-            ptrsrccb1 += 4;
-            ptrsrccb3 += 4;
-
-            (*ptrdestcr1++) = (*ptrsrccr1);
-            (*ptrdestcr2++) = (*ptrsrccr3);
-
-            ptrsrccr1 += 4;
-            ptrsrccr3 += 4;
-
+        src1 = src;
+        for (i = 0; i < height; i++) {
+            for (j = 0; j < width; j += 2) {
+            *dst_y++ = src1[1];
+            *dst_y++ = src1[3];
+            src1 += 4;
+            }
         }
 
+        src1 = src + width * 2;		/* next line */
 
-        /* Update src pointers */
-        ptrsrcy1  += srcystride;
-        ptrsrcy2  += srcystride;
-        ptrsrcy3  += srcystride;
-        ptrsrcy4  += srcystride;
+        dst_v = dst_y;
+        dst_u = dst_y + width * height / 4;
 
-        ptrsrccb1 += srcccstride;
-        ptrsrccb3 += srcccstride;
-
-        ptrsrccr1 += srcccstride;
-        ptrsrccr3 += srcccstride;
-
-
-        /* Update dest pointers */
-        ptrdesty1 += destystride;
-        ptrdesty2 += destystride;
-        ptrdesty3 += destystride;
-        ptrdesty4 += destystride;
-
-        ptrdestcb1 += destccstride;
-        ptrdestcb2 += destccstride;
-
-        ptrdestcr1 += destccstride;
-        ptrdestcr2 += destccstride;
-
-    }
+        for (i = 0; i < height; i += 2) {
+            for (j = 0; j < width; j += 2) {
+                *dst_u++ = (src[0] + src1[0]) / 2;
+                *dst_v++ = (src[2] + src1[2]) / 2;
+                src += 4;
+                src1 += 4;
+            }
+            src = src1;
+            src1 += width * 2;
+        }
 }
 
 
