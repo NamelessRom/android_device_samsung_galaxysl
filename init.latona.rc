@@ -144,6 +144,9 @@ on post-fs-data
     chmod 0660 /dev/video5
     chmod 0660 /dev/video0
 
+#Permission for DspBridge
+    chmod 0666 /dev/DspBridge
+
 # change permissions for Overlay
     chown system system /dev/video1
     chmod 0660 /dev/video1
