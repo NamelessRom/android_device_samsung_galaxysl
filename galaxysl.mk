@@ -96,14 +96,14 @@ PRODUCT_COPY_FILES += \
 
 # Prebuilt kl keymaps
 PRODUCT_COPY_FILES += \
-	device/samsung/galaxysl/keylayout/sec_jack.kl:system/usr/keylayout/sec_jack.kl \
-	device/samsung/galaxysl/keylayout/sec_key.kl:system/usr/keylayout/sec_key.kl \
-	device/samsung/galaxysl/keylayout/sec_power_key.kl:system/usr/keylayout/sec_power_key.kl \
-	device/samsung/galaxysl/keylayout/sec_touchscreen.kl:system/usr/keylayout/sec_touchscreen.kl
+	device/samsung/galaxysl/usr/keylayout/sec_jack.kl:system/usr/keylayout/sec_jack.kl \
+	device/samsung/galaxysl/usr/keylayout/sec_key.kl:system/usr/keylayout/sec_key.kl \
+	device/samsung/galaxysl/usr/keylayout/sec_power_key.kl:system/usr/keylayout/sec_power_key.kl \
+	device/samsung/galaxysl/usr/keylayout/sec_touchscreen.kl:system/usr/keylayout/sec_touchscreen.kl
 
 # IDC file for Touchscreen Calibration
 PRODUCT_COPY_FILES += \
-	device/samsung/galaxysl/sec_touchscreen.idc:system/usr/idc/sec_touchscreen.idc
+	device/samsung/galaxysl/usr/idc/sec_touchscreen.idc:system/usr/idc/sec_touchscreen.idc
 
 # These are the hardware-specific features
 PRODUCT_COPY_FILES += \
