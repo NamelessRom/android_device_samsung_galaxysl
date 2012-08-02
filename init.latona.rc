@@ -482,21 +482,6 @@ service wlan_ap_loader /system/bin/tiap_loader -i /system/etc/wifi/softap/tiwlan
     disabled
     oneshot
 
-service hostapd /system/bin/hostapd -B -P /data/misc/softap/hostapd_pid.pid /data/misc/softap/hostapd_create.conf
-    class main
-    disabled
-    oneshot
-
-service dhcpserver /system/bin/udhcpd_softap /system/etc/wifi/softap/udhcpd.conf
-    class main
-    disabled
-    oneshot
-
-service ifcfg_tiap /system/bin/ifconfig tiap0 192.168.43.1 netmask 255.255.255.0
-    class main
-    disabled
-    oneshot
-
 # DHCPCD
 # wi-fi
 service dhcpcd_tiwlan0 /system/bin/dhcpcd -ABKL tiwlan0
@@ -508,14 +493,6 @@ service dhcpcd_tiwlan0 /system/bin/dhcpcd -ABKL tiwlan0
 # wi-fi
 service iprenew_tiwlan0 /system/bin/dhcpcd -n
     class main
-    disabled
-    oneshot
-
-service hciattach /system/bin/brcm_patchram_plus --enable_hci --enable_lpm \
-    --baudrate 3000000 --patchram /vendor/firmware/bcm4329.hcd /dev/s3c2410_serial0
-    class main
-    user bluetooth
-    group bluetooth net_bt_admin
     disabled
     oneshot
 
@@ -542,7 +519,3 @@ service gpsd /system/vendor/bin/gpsd -c /system/vendor/etc/gps.xml
     user gps
     group system inet
 
-service tvout /system/bin/tvoutserver
-    class main
-    user system
-    group graphics
