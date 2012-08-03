@@ -503,7 +503,7 @@ int CameraHardware::previewThread()
 			// Get preview frame
 			tempbuf=mCamera->GrabPreviewFrame();
 		}
-                y422_to_yuv420((unsigned char *)tempbuf,(unsigned char *)dst, width, height);
+                yuv422_to_YV12((unsigned char *)tempbuf,(unsigned char *)dst, width, height);
                 mapper.unlock((buffer_handle_t)*hndl2hndl);
 
                 mNativeWindow->enqueue_buffer(mNativeWindow,(buffer_handle_t*) hndl2hndl);

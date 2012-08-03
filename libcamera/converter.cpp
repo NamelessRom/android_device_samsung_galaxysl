@@ -26,7 +26,7 @@ extern int version;
 #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
 #endif
 
-void y422_to_yuv420(unsigned char *bufsrc, unsigned char *bufdest, int width, int height)
+void yuv422_to_YV12(unsigned char *bufsrc, unsigned char *bufdest, int width, int height)
 {
         int i, j;
         uint8_t *src = (uint8_t *)bufsrc;
