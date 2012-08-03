@@ -40,6 +40,8 @@
 #define CAMERA_BF 0 //Back Camera
 #define CAMERA_FF 1
 
+static const int INITIAL_SKIP_FRAME = 3;
+
 #define CAMHAL_GRALLOC_USAGE GRALLOC_USAGE_HW_TEXTURE | \
                              GRALLOC_USAGE_HW_RENDER | \
                              GRALLOC_USAGE_SW_READ_RARELY | \
@@ -85,7 +87,8 @@ CameraHardware::CameraHardware(int CameraID)
                     mCallbackCookie(0),
                     mMsgEnabled(0),
                     previewStopped(true),
-                    mRecordingEnabled(false)
+                    mRecordingEnabled(false),
+                    mSkipFrame(0)
 {
 	/* create camera */
 	mCamera = new V4L2Camera();
@@ -465,6 +468,15 @@ int CameraHardware::previewThread()
     int framesize= width * height * 1.5 ; //yuv420sp
     int mRecordFramesize= width * height * 2;
 
+    mSkipFrameLock.lock();
+    if (mSkipFrame > 0) {
+        mSkipFrame--;
+        void * mSkipFrameBuf=mCamera->GrabPreviewFrame();
+        mSkipFrameLock.unlock();
+        LOGV("%s: index %d skipping frame", __func__, index);
+        return NO_ERROR;
+    }
+    mSkipFrameLock.unlock();
 
     if (!previewStopped) {
 
@@ -598,6 +610,8 @@ status_t CameraHardware::startPreview()
         return UNKNOWN_ERROR;
     }
 
+     setSkipFrame(INITIAL_SKIP_FRAME);
+
     /* start preview thread */
      previewStopped = false;
      mPreviewThread = new PreviewThread(this);
@@ -656,6 +670,9 @@ status_t CameraHardware::startRecording()
     mRecordBufferState[i]=0;
     mRecordHeap[i] = mRequestMemory(-1,mRecordingFrameSize, 1, NULL);
     }
+
+    //Skip the first recording frame since it is often garbled
+    setSkipFrame(1);
 
     mRecordingEnabled = true;
     return NO_ERROR;
@@ -1948,4 +1965,12 @@ double CameraHardware::getGPSAltitude() const
 		}
 }
 
+void CameraHardware::setSkipFrame(int frame)
+{
+    Mutex::Autolock lock(mSkipFrameLock);
+    if (frame < mSkipFrame)
+        return;
+
+    mSkipFrame = frame;
+}
 }; // namespace android

@@ -159,6 +159,7 @@ private:
 	double getGPSLatitude() const;
 	double getGPSLongitude() const;
 	double getGPSAltitude() const;
+	void setSkipFrame(int frame);
 
     int previewThread();
 	/* validating supported size */
@@ -186,6 +187,9 @@ private:
 	sp<MemoryBase>      mRawBuffer;
     sp<MemoryBase>      mBuffers[kBufferCount];
     int mRecordBufferState[kBufferCount];
+
+    mutable Mutex mSkipFrameLock;
+            int mSkipFrame;
 
     V4L2Camera         *mCamera;
     bool                mPreviewRunning;	
