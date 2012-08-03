@@ -101,6 +101,11 @@ CameraHardware::CameraHardware(int CameraID)
 
 	initDefaultParameters(CameraID);
         mNativeWindow=NULL;
+        for(int i = 0; i < NB_BUFFER; i++)
+	{
+		mRecordHeap[i] = NULL;
+		mRecordBufferState[i]=0;
+	}
 
     	mExitAutoFocusThread = false;
 	mAutoFocusThread = new AutoFocusThread(this);
@@ -369,7 +374,7 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
     int width, height;
     mParameters.getPreviewSize(&width, &height);
     mNativeWindow=window;
-    mNativeWindow->set_usage(mNativeWindow,GRALLOC_USAGE_HW_TEXTURE);
+    mNativeWindow->set_usage(mNativeWindow,GRALLOC_USAGE_SW_WRITE_OFTEN);
     mNativeWindow->set_buffers_geometry(
                 mNativeWindow,
                 width,
@@ -455,8 +460,10 @@ int CameraHardware::previewThread()
     IMG_native_handle_t** hndl2hndl;
     IMG_native_handle_t* handle;
     int stride;
+    int index;
     mParameters.getPreviewSize(&width, &height);
     int framesize= width * height * 1.5 ; //yuv420sp
+    int mRecordFramesize= width * height * 2;
 
 
     if (!previewStopped) {
@@ -477,10 +484,25 @@ int CameraHardware::previewThread()
             void *tempbuf;
             void *dst;
 
-            if(0 == mapper.lock((buffer_handle_t)*hndl2hndl,CAMHAL_GRALLOC_USAGE, bounds, &dst))
+            if(0 == mapper.lock((buffer_handle_t)*hndl2hndl,GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst))
             {
-                // Get preview frame
-                tempbuf=mCamera->GrabPreviewFrame();
+		Mutex::Autolock lock(mRecordingLock);
+		if(mRecordingEnabled)
+		{
+			tempbuf=mCamera->GrabRecordFrame(index);
+			nsecs_t timeStamp = systemTime(SYSTEM_TIME_MONOTONIC);
+			memcpy(mRecordHeap[index]->data,tempbuf,mRecordFramesize);
+			mRecordBufferState[index]=1;
+
+			if (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME ) {
+				mDataCbTimestamp(timeStamp, CAMERA_MSG_VIDEO_FRAME,mRecordHeap[index], 0, mCallbackCookie);
+			}else{
+				mCamera->ReleaseRecordFrame(index);
+			}
+		}else{
+			// Get preview frame
+			tempbuf=mCamera->GrabPreviewFrame();
+		}
                 y422_to_yuv420((unsigned char *)tempbuf,(unsigned char *)dst, width, height);
                 mapper.unlock((buffer_handle_t)*hndl2hndl);
 
@@ -488,26 +510,17 @@ int CameraHardware::previewThread()
 
                 if ((mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
 
-                    camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
-                    Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
-		    mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
-                }
-                    if ((mMsgEnabled & CAMERA_MSG_VIDEO_FRAME ) &&
-                         mRecordingEnabled ) {
-			Mutex::Autolock lock(mRecordingLock);
-                        nsecs_t timeStamp = systemTime(SYSTEM_TIME_MONOTONIC);
-		        camera_memory_t* recorder = mRequestMemory(-1, framesize, 1, NULL);
-                        memcpy(recorder->data,tempbuf,framesize);
-			mDataCb(CAMERA_MSG_VIDEO_FRAME,recorder,0,NULL,mCallbackCookie);
-                        mDataCbTimestamp(timeStamp, CAMERA_MSG_VIDEO_FRAME,recorder, 0, mCallbackCookie);
-                   }
-                mCamera->ReleasePreviewFrame();
+			camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
+			Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
+			mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
+		}
+
+
             }
 
         }
         mLock.unlock();
     }
-
     return NO_ERROR;
 }
 
@@ -629,13 +642,22 @@ bool CameraHardware::previewEnabled()
 status_t CameraHardware::startRecording()
 {
     LOGE("startRecording");
-    mRecordingLock.lock();
+    Mutex::Autolock lock(mRecordingLock);
+
+    int width,height;
+    mParameters.getPreviewSize(&width, &height);
+    int mRecordingFrameSize=width * height * 2;
+
+    for(int i = 0; i<NB_BUFFER; i++){
+        if (mRecordHeap[i] != NULL) {
+            mRecordHeap[i]->release(mRecordHeap[i]);
+            mRecordHeap[i] = 0;
+        }
+    mRecordBufferState[i]=0;
+    mRecordHeap[i] = mRequestMemory(-1,mRecordingFrameSize, 1, NULL);
+    }
+
     mRecordingEnabled = true;
-
-    mParameters.getPreviewSize(&mPreviewWidth, &mPreviewHeight);
-    LOGD("getPreviewSize width:%d,height:%d",mPreviewWidth,mPreviewHeight);
-
-    mRecordingLock.unlock();
     return NO_ERROR;
 
 }
@@ -643,10 +665,19 @@ status_t CameraHardware::startRecording()
 void CameraHardware::stopRecording()
 {
     LOGE("stopRecording");
-    mRecordingLock.lock();
-
+    Mutex::Autolock lock(mRecordingLock);
+    if(mRecordingEnabled)
+    {
+	for (int i = 0; i < NB_BUFFER; i++)
+	{
+		if(mRecordBufferState[i]!=0)
+		{
+			mCamera->ReleaseRecordFrame(i);
+			mRecordBufferState[i]=0;
+		}
+	}
     mRecordingEnabled = false;
-    mRecordingLock.unlock();
+    }
 }
 
 bool CameraHardware::recordingEnabled()
@@ -656,10 +687,12 @@ bool CameraHardware::recordingEnabled()
 
 void CameraHardware::releaseRecordingFrame(const void* opaque)
 {
-    if (UNLIKELY(mDebugFps)) {
-        showFPS("Recording");
-    }
-    return;
+    int i;
+    for (i = 0; i < NB_BUFFER; i++)
+	if((void *)opaque == mRecordHeap[i]->data)
+            break;
+    mCamera->ReleaseRecordFrame(i);
+    mRecordBufferState[i]=0;
 }
 
 // ---------------------------------------------------------------------------
@@ -1179,6 +1212,12 @@ void CameraHardware::release()
     if (mPictureThread != NULL) {
         mPictureThread->requestExitAndWait();
         mPictureThread.clear();
+    }
+    for(int i=0; i<NB_BUFFER; i++){
+        if (mRecordHeap[i] != NULL) {
+            mRecordHeap[i]->release(mRecordHeap[i]);
+            mRecordHeap[i] = NULL;
+        }
     }
 	mCamera->Uninit(0);
 	mCamera->Close();

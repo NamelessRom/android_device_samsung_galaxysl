@@ -100,7 +100,7 @@ public:
 
 private:
 
-    static const int kBufferCount = 4;
+    static const int kBufferCount = 6;
 
     class PreviewThread : public Thread {
         CameraHardware* mHardware;
@@ -171,6 +171,7 @@ private:
 
     camera_request_memory   mRequestMemory;
     preview_stream_ops_t*  mNativeWindow;
+    camera_memory_t     *mRecordHeap[kBufferCount];
 
     mutable Mutex       mLock;           // member property lock
     mutable Mutex       mPreviewLock;    // hareware v4l2 operation lock
@@ -184,6 +185,7 @@ private:
 	sp<MemoryHeapBase>  mRawHeap;      /* format: 422 */
 	sp<MemoryBase>      mRawBuffer;
     sp<MemoryBase>      mBuffers[kBufferCount];
+    int mRecordBufferState[kBufferCount];
 
     V4L2Camera         *mCamera;
     bool                mPreviewRunning;	

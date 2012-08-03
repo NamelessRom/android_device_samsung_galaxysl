@@ -19,7 +19,7 @@
 #ifndef _V4L2CAMERA_H
 #define _V4L2CAMERA_H
 
-#define NB_BUFFER 4
+#define NB_BUFFER 6
 #define DEFAULT_FRAME_RATE 30
 
 #include <binder/MemoryBase.h>
@@ -129,7 +129,8 @@ public:
 
 
     void * GrabPreviewFrame ();
-    void ReleasePreviewFrame ();
+    void * GrabRecordFrame (int& index);
+    void ReleaseRecordFrame (int index);
     void GrabRawFrame(void *previewBuffer, unsigned int width, unsigned int height);
     camera_memory_t* GrabJpegFrame (camera_request_memory mRequestMemory,unsigned long& mfilesize,bool IsFrontCam);
     camera_memory_t* CreateJpegFromBuffer(void *rawBuffer, camera_request_memory mRequestMemory);

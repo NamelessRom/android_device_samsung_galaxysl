@@ -190,7 +190,6 @@ int camera_recording_enabled(struct camera_device * device)
 void camera_release_recording_frame(struct camera_device * device,
                 const void *opaque)
 {
-    LOG_FUNCTION_NAME
     return V4L2CameraHardware->releaseRecordingFrame(opaque);
 }
 

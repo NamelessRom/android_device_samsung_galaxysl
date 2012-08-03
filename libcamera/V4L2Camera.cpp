@@ -454,7 +454,7 @@ int V4L2Camera::setFramerate(int framerate,int cam_mode){
     struct v4l2_streamparm parm;
 
 	parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	parm.parm.capture.capturemode = 4;
+	parm.parm.capture.capturemode = 1;
 	if(cam_mode==0)
 	parm.parm.capture.currentstate = V4L2_MODE_PREVIEW;
 	else
@@ -692,18 +692,51 @@ void * V4L2Camera::GrabPreviewFrame ()
     }
     nDequeued++;
 
-    return( videoIn->mem[videoIn->buf.index] );
-}
-
-void V4L2Camera::ReleasePreviewFrame ()
-{
-    int ret;
     ret = ioctl(camHandle, VIDIOC_QBUF, &videoIn->buf);
     nQueued++;
     if (ret < 0) {
-        LOGE("ReleasePreviewFrame: VIDIOC_QBUF Failed");
+        LOGE("GrabPreviewFrame: VIDIOC_QBUF Failed");
+        return NULL;
+    }
+
+    return( videoIn->mem[videoIn->buf.index] );
+}
+
+void* V4L2Camera::GrabRecordFrame (int& index)
+{
+    int ret;
+
+    videoIn->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    videoIn->buf.memory = V4L2_MEMORY_MMAP;
+
+    /* DQ */
+    ret = ioctl(camHandle, VIDIOC_DQBUF, &videoIn->buf);
+    if (ret < 0) {
+        LOGE("GrabRecordFrame: VIDIOC_DQBUF Failed");
+        return NULL;
+    }
+    nDequeued++;
+
+    index=videoIn->buf.index;
+
+    return( videoIn->mem[videoIn->buf.index] );
+}
+
+void V4L2Camera::ReleaseRecordFrame (int index)
+{
+    int ret;
+
+    videoIn->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    videoIn->buf.memory = V4L2_MEMORY_MMAP;
+    videoIn->buf.index = index;
+
+    ret = ioctl(camHandle, VIDIOC_QBUF, &videoIn->buf);
+    nQueued++;
+    if (ret < 0) {
+        LOGE("ReleaseRecordFrame: VIDIOC_QBUF Failed");
         return;
     }
+    return;
 }
 
 void V4L2Camera::GrabRawFrame(void *previewBuffer,unsigned int width, unsigned int height)
@@ -1459,6 +1492,7 @@ int V4L2Camera::getOrientation()
 {
 	return (m_exif_orientation);
 }
+
 void V4L2Camera::convert(unsigned char *buf, unsigned char *rgb, int width, int height)
 {
     int x,y,z=0;
