@@ -90,6 +90,10 @@ PRODUCT_COPY_FILES += \
 PRODUCT_COPY_FILES += \
     device/samsung/galaxysl/etc/media_profiles.xml:system/etc/media_profiles.xml
 
+#Bluetooth configuration files
+PRODUCT_COPY_FILES += \
+    device/samsung/galaxysl/etc/bluetooth/main.conf:system/etc/bluetooth/main.conf
+
 # Prebuilt kl keymaps
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/keylayout/sec_jack.kl:system/usr/keylayout/sec_jack.kl \
