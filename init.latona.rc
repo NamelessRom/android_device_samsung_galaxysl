@@ -187,6 +187,10 @@ on post-fs-data
     mkdir /data/misc/wifi/sockets 0770 wifi wifi
     mkdir /data/misc/dhcp 0770 dhcp dhcp
 
+# ril-logging
+    mkdir /data/log 0775 root root
+    chmod 0775 /data/log
+
 # change permission for uart_switch
     chown radio radio /sys/class/sec/uart_switch/UART_SEL/value
     chmod 660 /sys/class/sec/uart_switch/UART_SEL/value
