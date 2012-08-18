@@ -1038,13 +1038,6 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
      * that isn't exactly what we're already at.
      * but the check is performed when requesting only changing fps range
      */
-     	if ((new_min_fps > new_max_fps) || (new_min_fps < 0) || (new_max_fps < 0)) {
-         LOGE("WARN(%s): request for preview frame is not initial. \n",__func__);
-         return UNKNOWN_ERROR;
-     	} else {
-		mParameters.setPreviewFrameRate(new_max_fps/1000);
-     	}
-
     if (new_scene_mode_str && current_scene_mode_str) {
         if (!strcmp(new_scene_mode_str, current_scene_mode_str)) {
             if ((new_min_fps != current_min_fps) || (new_max_fps != current_max_fps)) {
