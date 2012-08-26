@@ -564,9 +564,6 @@ status_t CameraHardware::startPreview()
 	    	LOGE("Fail to configure camera device");
 	    	return INVALID_OPERATION;
     }
-   //dhiru1602 : Set FFC Flip
-   if(mCameraID==CAMERA_FF)
-   	mCamera->SetCameraFlip(false);
    /* clear previously buffers*/
     if(mPreviewHeap != NULL) {
         LOGD("mPreviewHeap Cleaning!!!!");
@@ -848,10 +845,6 @@ int CameraHardware::pictureThread()
 	    	LOGE("Fail to configure camera device");
 	    	return INVALID_OPERATION;
     }
-   //dhiru1602 : Set FFC Flip
-   if(mCameraID==CAMERA_FF)
-   	mCamera->SetCameraFlip(true);
-
      ret = mCamera->BufferMap(1);
      if (ret) {
          LOGE("Camera BufferMap fail: %s", strerror(errno));
