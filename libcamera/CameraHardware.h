@@ -46,7 +46,6 @@
 #include <jpeglib.h>
 #include "V4L2Camera.h"
 
-#include <cutils/tztime.h>
 #include <math.h>
 #include "Exif.h"
 #include "ExifCreator.h"

@@ -34,8 +34,8 @@
 #include "v4l2-subdev.h"
 
 #include <videodev2.h>
-#define LOG_FUNCTION_START    LOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
-#define LOG_FUNCTION_EXIT    LOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
+#define LOG_FUNCTION_START    ALOGD("%d: %s() ENTER", __LINE__, __FUNCTION__);
+#define LOG_FUNCTION_EXIT    ALOGD("%d: %s() EXIT", __LINE__, __FUNCTION__);
 
 /* TODO: enable once resizer driver is up 
 #define _OMAP_RESIZER_ 0*/

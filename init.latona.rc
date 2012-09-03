@@ -1,22 +1,24 @@
 import init.latona.usb.rc
 
 on early-init
-    export EXTERNAL_STORAGE /mnt/sdcard
-    export SECONDARY_STORAGE /mnt/emmc
+    export EXTERNAL_STORAGE /storage/sdcard0
+    export SECONDARY_STORAGE /storage/sdcard1
     export DOWNLOAD_CACHE /data/download
 
     export DSP_PATH /system/lib/dsp
     export DEFAULT_BASEIMAGE /system/lib/dsp/baseimage.dof
     export QOSDYN_FILE /system/lib/dsp/qosdyn_3430.dll64P
 
-    mkdir /mnt/sdcard 0000 system system
-    symlink /mnt/sdcard /sdcard
-
-    mkdir /mnt/emmc 0000 system system
-    symlink /mnt/emmc /emmc
-
     mkdir /dbdata 0771 system system
     mkdir /efs 0771 system system
+
+    mkdir /storage 0050 system sdcard_r
+    mkdir /storage/sdcard0 0000 system system
+    mkdir /storage/sdcard1 0000 system system
+    symlink /storage/sdcard0 /sdcard
+    symlink /storage/sdcard0 /mnt/sdcard
+    symlink /storage/sdcard1 /emmc
+    symlink /storage/sdcard1 /mnt/emmc
 
     mkdir /debug
     mount debugfs /sys/kernel/debug /sys/kernel/debug

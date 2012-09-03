@@ -77,7 +77,7 @@
 #define LOCK_BUFFER_TRIES 5
 #define HAL_PIXEL_FORMAT_NV12 0x100
 
-#define CAMHAL_LOGI LOGI
+#define CAMHAL_ALOGI ALOGI
 
 //Uncomment to enable more verbose/debug logs
 #define DEBUG_LOG
@@ -85,13 +85,13 @@
 ///Camera HAL Logging Functions
 #ifndef DEBUG_LOG
 
-#define CAMHAL_LOGDA(str)
-#define CAMHAL_LOGDB(str, ...)
+#define CAMHAL_ALOGDA(str)
+#define CAMHAL_ALOGDB(str, ...)
 #define CAMHAL_LOGVA(str)
 #define CAMHAL_LOGVB(str, ...)
 
-#define CAMHAL_LOGEA LOGE
-#define CAMHAL_LOGEB LOGE
+#define CAMHAL_ALOGEA ALOGE
+#define CAMHAL_ALOGEB ALOGE
 
 #undef LOG_FUNCTION_NAME
 #undef LOG_FUNCTION_NAME_EXIT
@@ -103,16 +103,16 @@
 #undef LOG_FUNCTION_NAME
 #undef LOG_FUNCTION_NAME_EXIT
 #define __FILENAME__ strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__
-#define LOG_FUNCTION_NAME LOGE("++++Entering %s:%s", __FILENAME__, __FUNCTION__)
-#define LOG_FUNCTION_NAME_EXIT LOGE("----Exiting %s:%s",__FILENAME__, __FUNCTION__)
+#define LOG_FUNCTION_NAME ALOGE("++++Entering %s:%s", __FILENAME__, __FUNCTION__)
+#define LOG_FUNCTION_NAME_EXIT ALOGE("----Exiting %s:%s",__FILENAME__, __FUNCTION__)
 
-#define CAMHAL_LOGDA DBGUTILS_LOGDA
-#define CAMHAL_LOGDB DBGUTILS_LOGDB
+#define CAMHAL_ALOGDA DBGUTILS_ALOGDA
+#define CAMHAL_ALOGDB DBGUTILS_ALOGDB
 #define CAMHAL_LOGVA DBGUTILS_LOGVA
 #define CAMHAL_LOGVB DBGUTILS_LOGVB
 
-#define CAMHAL_LOGEA DBGUTILS_LOGEA
-#define CAMHAL_LOGEB DBGUTILS_LOGEB
+#define CAMHAL_ALOGEA DBGUTILS_ALOGEA
+#define CAMHAL_ALOGEB DBGUTILS_ALOGEB
 
 #endif
 

@@ -24,7 +24,6 @@
 #include <utils/SortedVector.h>
 
 #include <hardware_legacy/AudioHardwareBase.h>
-#include <media/mediarecorder.h>
 #include <hardware/audio_effect.h>
 
 #include "secril-client.h"
@@ -48,7 +47,7 @@ namespace android_audio_legacy {
     using android::Vector;
 
 // TODO: determine actual audio DSP and hardware latency
-// Additionnal latency introduced by audio DSP and hardware in ms
+// Additional latency introduced by audio DSP and hardware in ms
 #define AUDIO_HW_OUT_LATENCY_MS 0
 // Default audio output sample rate
 #define AUDIO_HW_OUT_SAMPLERATE 44100
