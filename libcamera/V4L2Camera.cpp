@@ -630,8 +630,7 @@ void V4L2Camera::Uninit(int cam_mode)
 
     /* Unmap buffers */
     for (int i = 0; i < mMaxBuffers; i++)
-        if (munmap(videoIn->mem[i], videoIn->buf.length) < 0)
-            ALOGE("Uninit: Unmap failed");
+        munmap(videoIn->mem[i], videoIn->buf.length);
     }
     return;
 }
@@ -1491,6 +1490,12 @@ int V4L2Camera::getBrightness(void)
 int V4L2Camera::getOrientation()
 {
 	return (m_exif_orientation);
+}
+
+void V4L2Camera::stopPreview()
+{
+	Uninit(0);
+        StopStreaming();
 }
 
 void V4L2Camera::convert(unsigned char *buf, unsigned char *rgb, int width, int height)

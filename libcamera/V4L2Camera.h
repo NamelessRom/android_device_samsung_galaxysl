@@ -111,6 +111,7 @@ public:
 	int GetThumbNailDataSize();
 	int setExifOrientationInfo(int orientationInfo);
 	int getOrientation();
+	void stopPreview();
 	int GetJPEG_Capture_Width();
 	int GetJPEG_Capture_Height();
 	int GetCamera_version();

@@ -114,6 +114,14 @@ CameraHardware::CameraHardware(int CameraID)
 	mAutoFocusThread = new AutoFocusThread(this);
     	mPictureThread = new PictureThread(this);
 
+    mExitPreviewThread = false;
+    /* whether the PreviewThread is active in preview or stopped.  we
+     * create the thread but it is initially in stopped state.
+     */
+    mPreviewRunning = false;
+    mPreviewStartDeferred = false;
+    mPreviewThread = new PreviewThread(this);
+
 
     /* whether prop "debug.camera.showfps" is enabled or not */
     char value[PROPERTY_VALUE_MAX];
@@ -383,13 +391,22 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
                 width,
                 height,
                 HAL_PIXEL_FORMAT_YV12);
-    err = mNativeWindow->set_buffer_count(mNativeWindow, 3);
+    err = mNativeWindow->set_buffer_count(mNativeWindow, NB_BUFFER);
     if (err != 0) {
         ALOGE("native_window_set_buffer_count failed: %s (%d)", strerror(-err), -err);
 
         if ( ENODEV == err ) {
             ALOGE("Preview surface abandoned!");
             mNativeWindow = NULL;
+        }
+    }
+
+    if (mPreviewRunning && mPreviewStartDeferred) {
+        LOGV("start/resume preview");
+        status_t ret = startPreviewInternal();
+        if (ret == OK) {
+            mPreviewStartDeferred = false;
+            mPreviewCondition.signal();
         }
     }
 
@@ -455,6 +472,30 @@ static void showFPS(const char *tag)
     }
 }
 
+int CameraHardware::previewThreadWrapper()
+{
+    LOGI("%s: starting", __func__);
+    while (1) {
+        mPreviewLock.lock();
+        while (!mPreviewRunning) {
+            LOGI("%s: calling mCamera->stopPreview() and waiting", __func__);
+            mCamera->stopPreview();
+            /* signal that we're stopping */
+            mPreviewStoppedCondition.signal();
+            mPreviewCondition.wait(mPreviewLock);
+            LOGI("%s: return from wait", __func__);
+        }
+        mPreviewLock.unlock();
+
+        if (mExitPreviewThread) {
+            LOGI("%s: exiting", __func__);
+            mCamera->stopPreview();
+            return 0;
+        }
+        previewThread();
+    }
+}
+
 int CameraHardware::previewThread()
 {
 
@@ -467,20 +508,19 @@ int CameraHardware::previewThread()
     mParameters.getPreviewSize(&width, &height);
     int framesize= width * height * 1.5 ; //yuv420sp
     int mRecordFramesize= width * height * 2;
+    void * tempbuf;
+
+    tempbuf=mCamera->GrabPreviewFrame();
 
     mSkipFrameLock.lock();
     if (mSkipFrame > 0) {
         mSkipFrame--;
-        void * mSkipFrameBuf=mCamera->GrabPreviewFrame();
         mSkipFrameLock.unlock();
         ALOGV("%s: index %d skipping frame", __func__, index);
         return NO_ERROR;
     }
     mSkipFrameLock.unlock();
 
-    if (!previewStopped) {
-
-        mLock.lock();
 
         if (mNativeWindow != NULL) {
 
@@ -493,11 +533,23 @@ int CameraHardware::previewThread()
             GraphicBufferMapper &mapper = GraphicBufferMapper::get();
             Rect bounds(width, height);
 
-            void *tempbuf;
             void *dst;
 
             if(0 == mapper.lock((buffer_handle_t)*hndl2hndl,GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst))
             {
+
+                yuv422_to_YV12((unsigned char *)tempbuf,(unsigned char *)dst, width, height);
+                mapper.unlock((buffer_handle_t)*hndl2hndl);
+
+                mNativeWindow->enqueue_buffer(mNativeWindow,(buffer_handle_t*) hndl2hndl);
+
+		if ((mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
+
+			camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
+			Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
+			mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
+		}
+
 		Mutex::Autolock lock(mRecordingLock);
 		if(mRecordingEnabled)
 		{
@@ -511,44 +563,54 @@ int CameraHardware::previewThread()
 			}else{
 				mCamera->ReleaseRecordFrame(index);
 			}
-		}else{
-			// Get preview frame
-			tempbuf=mCamera->GrabPreviewFrame();
-		}
-                yuv422_to_YV12((unsigned char *)tempbuf,(unsigned char *)dst, width, height);
-                mapper.unlock((buffer_handle_t)*hndl2hndl);
-
-                mNativeWindow->enqueue_buffer(mNativeWindow,(buffer_handle_t*) hndl2hndl);
-
-                if ((mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
-
-			camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
-			Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
-			mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
 		}
 
 
             }
 
         }
-        mLock.unlock();
-    }
+
     return NO_ERROR;
 }
 
 status_t CameraHardware::startPreview()
 {
 
+    int ret = 0;
+
+    mPreviewLock.lock();
+    if (mPreviewRunning) {
+        // already running
+        LOGE("%s : preview thread already running", __func__);
+        mPreviewLock.unlock();
+        return INVALID_OPERATION;
+    }
+
+    mPreviewRunning = true;
+    mPreviewStartDeferred = false;
+
+    if (!mNativeWindow) {
+        ALOGI("%s : deferring", __func__);
+        mPreviewStartDeferred = true;
+        mPreviewLock.unlock();
+        return NO_ERROR;
+    }
+
+    ret = startPreviewInternal();
+    if (ret == OK)
+        mPreviewCondition.signal();
+
+    mPreviewLock.unlock();
+    return ret;
+
+}
+
+status_t CameraHardware::startPreviewInternal()
+{
     int width, height;
     int mHeapSize = 0;
     int ret = 0;
     int fps = mParameters.getPreviewFrameRate();
-
-
-    Mutex::Autolock lock(mPreviewLock);
-    if (mPreviewThread != 0) {
-        return INVALID_OPERATION;
-    }
 
     mParameters.getPreviewSize(&mPreviewWidth, &mPreviewHeight);
     ALOGD("startPreview width:%d,height:%d",mPreviewWidth,mPreviewHeight);
@@ -609,45 +671,41 @@ status_t CameraHardware::startPreview()
 
      setSkipFrame(INITIAL_SKIP_FRAME);
 
-    /* start preview thread */
-     previewStopped = false;
-     mPreviewThread = new PreviewThread(this);
-
     return NO_ERROR;
 }
 
+void CameraHardware::stopPreviewInternal()
+{
+    ALOGV("%s :", __func__);
+
+    /* request that the preview thread stop. */
+    if (mPreviewRunning) {
+        mPreviewRunning = false;
+        if (!mPreviewStartDeferred) {
+            mPreviewCondition.signal();
+            /* wait until preview thread is stopped */
+            mPreviewStoppedCondition.wait(mPreviewLock);
+        }
+        else
+            ALOGV("%s : preview running but deferred, doing nothing", __func__);
+    } else
+        ALOGI("%s : preview not running, doing nothing", __func__);
+}
+
+
 void CameraHardware::stopPreview()
 {
-    sp<PreviewThread> previewThread;
-    { /* scope for the lock */
-        Mutex::Autolock lock(mPreviewLock);
-        previewStopped = true;
-        previewThread = mPreviewThread;
-	ALOGV("scope for the lock");
-    }
-
-    /* don't hold the lock while waiting for the thread to quit */
-	if (previewThread != 0) {
-		previewThread->requestExitAndWait();
-		ALOGV("previewThread->requestExitAndWait();");
-	}
-
-    if (mPreviewThread != 0) {
-        mCamera->Uninit(0);
-        mCamera->StopStreaming();
-	ALOGV(" mCamera->StopStreaming();");
-    }
-
-    Mutex::Autolock lock(mPreviewLock);
-    mPreviewThread.clear();
-	ALOGV("return");
+    mPreviewLock.lock();
+    stopPreviewInternal();
+    mPreviewLock.unlock();
     return;
 }
 
 bool CameraHardware::previewEnabled()
 {
-	Mutex::Autolock lock(mPreviewLock);  
-	return mPreviewThread != 0;
+    Mutex::Autolock lock(mPreviewLock);
+    LOGV("%s : %d", __func__, mPreviewRunning);
+    return mPreviewRunning;
 }
 
 status_t CameraHardware::startRecording()
@@ -1196,10 +1254,15 @@ status_t CameraHardware::sendCommand(int32_t cmd, int32_t arg1, int32_t arg2)
 
 void CameraHardware::release()
 {
-    if (mPreviewThread != NULL) {
-	mLock.lock();
+   if (mPreviewThread != NULL) {
+        /* this thread is normally already in it's threadLoop but blocked
+         * on the condition variable or running.  signal it so it wakes
+         * up and can exit.
+         */
         mPreviewThread->requestExit();
-	mLock.unlock();
+        mExitPreviewThread = true;
+        mPreviewRunning = true; /* let it run so it can exit */
+        mPreviewCondition.signal();
         mPreviewThread->requestExitAndWait();
         mPreviewThread.clear();
     }
