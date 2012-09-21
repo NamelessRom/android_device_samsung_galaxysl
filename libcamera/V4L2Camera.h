@@ -89,8 +89,8 @@ public:
     int init_parm();
     void Uninit (int cam_mode);
 
-    int StartStreaming ();
-    int StopStreaming ();
+    int StartStreaming (int cam_mode);
+    int StopStreaming (int cam_mode);
 
     int setAutofocus();
     int getAutoFocusResult();

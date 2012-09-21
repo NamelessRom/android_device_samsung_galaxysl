@@ -346,7 +346,7 @@ ret:
 CameraHardware::~CameraHardware()
 {
 	mCamera->Uninit(0);
-	mCamera->StopStreaming();
+	mCamera->StopStreaming(0);
 	mCamera->Close();
     delete mCamera;
     mCamera = 0;
@@ -680,7 +680,7 @@ status_t CameraHardware::startPreviewInternal()
         return UNKNOWN_ERROR;
     }
 
-    ret = mCamera->StartStreaming();
+    ret = mCamera->StartStreaming(0);
     if (ret) {
         ALOGE("Camera StartStreaming fail: %s", strerror(errno));
         mCamera->Uninit(0);
@@ -928,7 +928,7 @@ int CameraHardware::pictureThread()
          return UNKNOWN_ERROR;
      }
 
-     ret = mCamera->StartStreaming();
+     ret = mCamera->StartStreaming(1);
      if (ret) {
         ALOGE("Camera StartStreaming fail: %s", strerror(errno));
         mCamera->Uninit(1);
@@ -974,7 +974,7 @@ int CameraHardware::pictureThread()
 
     /* Close operation */
     mCamera->Uninit(1);
-    mCamera->StopStreaming();
+    mCamera->StopStreaming(1);
 
     ALOGV ("End pictureThread()");
     return NO_ERROR;

@@ -635,7 +635,7 @@ void V4L2Camera::Uninit(int cam_mode)
     return;
 }
 
-int V4L2Camera::StartStreaming ()
+int V4L2Camera::StartStreaming (int cam_mode)
 {
     	enum v4l2_buf_type type;
 	struct v4l2_control vc;
@@ -650,18 +650,19 @@ int V4L2Camera::StartStreaming ()
             return ret;
         }
 
-        videoIn->isStreaming = true;
+	if(cam_mode==0)
+            videoIn->isStreaming = true;
     }
 
     return 0;
 }
 
-int V4L2Camera::StopStreaming ()
+int V4L2Camera::StopStreaming (int cam_mode)
 {
     enum v4l2_buf_type type;
     int ret;
 
-    if (videoIn->isStreaming) {
+    if (videoIn->isStreaming || cam_mode == 1) {
         type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
         ret = ioctl (camHandle, VIDIOC_STREAMOFF, &type);
@@ -1128,9 +1129,12 @@ int V4L2Camera::setAutofocus(void)
         return -1;
     }
 
-    if (v4l2_s_ctrl(camHandle, V4L2_CID_AF, AF_START) < 0) {
+    if(videoIn->isStreaming)
+    {
+        if (v4l2_s_ctrl(camHandle, V4L2_CID_AF, AF_START) < 0) {
             ALOGE("ERR(%s):Fail on V4L2_CID_CAMERA_SET_AUTO_FOCUS", __func__);
-        return -1;
+            return -1;
+        }
     }
 
     mAutofocusRunning=1;
@@ -1174,7 +1178,7 @@ int V4L2Camera::cancelAutofocus(void)
 
     /* AF_STOP restores the sensor focus state to default. Hence,
        we only use AF_STOP only when Autofocus is currently running */
-    if(mAutofocusRunning)
+    if(!mAutofocusRunning && videoIn->isStreaming)
     {
     	if (v4l2_s_ctrl(camHandle, V4L2_CID_AF, AF_STOP) < 0) {
         	ALOGE("ERR(%s):Fail on V4L2_CID_CAMERA_SET_AUTO_FOCUS", __func__);
@@ -1497,7 +1501,7 @@ int V4L2Camera::getOrientation()
 void V4L2Camera::stopPreview()
 {
 	Uninit(0);
-        StopStreaming();
+        StopStreaming(0);
 }
 
 void V4L2Camera::convert(unsigned char *buf, unsigned char *rgb, int width, int height)
