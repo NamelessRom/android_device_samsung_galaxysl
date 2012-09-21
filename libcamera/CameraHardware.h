@@ -41,6 +41,8 @@
 
 #include <camera/CameraParameters.h>
 #include <hardware/camera.h>
+#include <hardware/hardware.h>
+#include <hardware/gralloc.h>
 #include <sys/ioctl.h>
 
 #include <jpeglib.h>
@@ -256,6 +258,7 @@ private:
 			int mPreviousSaturation;
 			int mPreviousSharpness;
 			int mPreviousMetering;
+    static gralloc_module_t const* mGrallocHal;
 };
 
 }; // namespace android

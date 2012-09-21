@@ -24,8 +24,7 @@ LOCAL_SHARED_LIBRARIES:= \
     libutils \
     libcutils \
     libcamera_client \
-    libcameraservice \
-    libgui \
+    libhardware \
     libjpeg \
     libexif
 

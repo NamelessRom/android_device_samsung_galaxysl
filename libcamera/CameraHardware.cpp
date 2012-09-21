@@ -73,6 +73,7 @@ const char CameraHardware::supportedPictureSizes_ffc [] = "640x480";
 const char CameraHardware::supportedPictureSizes_bfc [] = "2560x1920,2560x1536,2048x1536,2048x1232,1600x1200,1600x960,800x480,640x480";
 const char CameraHardware::supportedPreviewSizes_ffc [] = "640x480,320x240,176x144";
 const char CameraHardware::supportedPreviewSizes_bfc [] = "1280x720,800x480,720x480,640x480,352x288";
+gralloc_module_t const* CameraHardware::mGrallocHal;
 
 CameraHardware::CameraHardware(int CameraID)
                   : mParameters(),
@@ -94,6 +95,8 @@ CameraHardware::CameraHardware(int CameraID)
 	mCamera = new V4L2Camera();
 	version = get_kernel_version();
 	mCameraID=CameraID;
+	int ret = 0;
+
 	if(CameraID==CAMERA_FF)
 	{
 		mCamera->Open(VIDEO_DEVICE_2);
@@ -108,6 +111,12 @@ CameraHardware::CameraHardware(int CameraID)
 	{
 		mRecordHeap[i] = NULL;
 		mRecordBufferState[i]=0;
+	}
+
+	if (!mGrallocHal) {
+		ret = hw_get_module(GRALLOC_HARDWARE_MODULE_ID, (const hw_module_t **)&mGrallocHal);
+	if (ret)
+		LOGE("ERR(%s):Fail on loading gralloc HAL", __func__);
 	}
 
     	mExitAutoFocusThread = false;
@@ -498,19 +507,13 @@ int CameraHardware::previewThreadWrapper()
 
 int CameraHardware::previewThread()
 {
-
-    int width, height;
-    int err;
-    IMG_native_handle_t** hndl2hndl;
-    IMG_native_handle_t* handle;
-    int stride;
     int index;
-    mParameters.getPreviewSize(&width, &height);
-    int framesize= width * height * 1.5 ; //yuv420sp
-    int mRecordFramesize= width * height * 2;
-    void * tempbuf;
+    nsecs_t timestamp;
+    struct addrs *addrs;
 
-    tempbuf=mCamera->GrabPreviewFrame();
+    void * tempbuf=mCamera->GrabPreviewFrame(index);
+
+//  LOGV("%s: index %d", __func__, index);
 
     mSkipFrameLock.lock();
     if (mSkipFrame > 0) {
@@ -521,54 +524,70 @@ int CameraHardware::previewThread()
     }
     mSkipFrameLock.unlock();
 
+    timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
-        if (mNativeWindow != NULL) {
+    int width, height, frame_size;
 
-            if ((err = mNativeWindow->dequeue_buffer(mNativeWindow,(buffer_handle_t**) &hndl2hndl,&stride)) != 0) {
-                ALOGW("Surface::dequeueBuffer returned error %d", err);
-                return -1;
-            }
+    mParameters.getPreviewSize(&width, &height);
+    frame_size = width * height * 1.5;
 
-            mNativeWindow->lock_buffer(mNativeWindow, (buffer_handle_t*) hndl2hndl);
-            GraphicBufferMapper &mapper = GraphicBufferMapper::get();
-            Rect bounds(width, height);
-
-            void *dst;
-
-            if(0 == mapper.lock((buffer_handle_t)*hndl2hndl,GRALLOC_USAGE_SW_WRITE_OFTEN, bounds, &dst))
-            {
-
-                yuv422_to_YV12((unsigned char *)tempbuf,(unsigned char *)dst, width, height);
-                mapper.unlock((buffer_handle_t)*hndl2hndl);
-
-                mNativeWindow->enqueue_buffer(mNativeWindow,(buffer_handle_t*) hndl2hndl);
-
-		if ((mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME)) {
-
-			camera_memory_t* picture = mRequestMemory(-1, framesize, 1, NULL);
-			Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
-			mDataCb(CAMERA_MSG_PREVIEW_FRAME,picture,0,NULL,mCallbackCookie);
-		}
-
-		Mutex::Autolock lock(mRecordingLock);
-		if(mRecordingEnabled)
-		{
-			tempbuf=mCamera->GrabRecordFrame(index);
-			nsecs_t timeStamp = systemTime(SYSTEM_TIME_MONOTONIC);
-			memcpy(mRecordHeap[index]->data,tempbuf,mRecordFramesize);
-			mRecordBufferState[index]=1;
-
-			if (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME ) {
-				mDataCbTimestamp(timeStamp, CAMERA_MSG_VIDEO_FRAME,mRecordHeap[index], 0, mCallbackCookie);
-			}else{
-				mCamera->ReleaseRecordFrame(index);
-			}
-		}
-
-
-            }
-
+    if (mNativeWindow && mGrallocHal) {
+        buffer_handle_t *buf_handle;
+        int stride;
+        if (0 != mNativeWindow->dequeue_buffer(mNativeWindow, &buf_handle, &stride)) {
+            ALOGE("Could not dequeue gralloc buffer!\n");
+            goto callbacks;
         }
+
+        void *vaddr;
+        if (!mGrallocHal->lock(mGrallocHal,
+                               *buf_handle,
+                               GRALLOC_USAGE_SW_WRITE_OFTEN,
+                               0, 0, width, height, &vaddr)) {
+
+	    yuv422_to_YV12((unsigned char *)tempbuf,(unsigned char *)vaddr, width, height);
+
+            mGrallocHal->unlock(mGrallocHal, *buf_handle);
+        }
+        else
+            ALOGE("%s: could not obtain gralloc buffer", __func__);
+
+        if (0 != mNativeWindow->enqueue_buffer(mNativeWindow, buf_handle)) {
+            ALOGE("Could not enqueue gralloc buffer!\n");
+            goto callbacks;
+        }
+    }
+
+callbacks:
+    // Notify the client of a new frame.
+    if (mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) {
+        const char * preview_format = mParameters.getPreviewFormat();
+	camera_memory_t* picture = mRequestMemory(-1, frame_size, 1, NULL);
+        if (!strcmp(preview_format, CameraParameters::PIXEL_FORMAT_YUV420SP)) {
+	    Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
+        }
+        mDataCb(CAMERA_MSG_PREVIEW_FRAME, picture, index, NULL, mCallbackCookie);
+    }
+
+    Mutex::Autolock lock(mRecordingLock);
+    if (mRecordingEnabled == true) {
+        tempbuf=mCamera->GrabRecordFrame(index);
+        if (index < 0) {
+            ALOGE("ERR(%s):Fail on mCamera->GrabRecordFrame()", __func__);
+            return UNKNOWN_ERROR;
+        }
+
+	int mRecordFramesize = width * height * 2;
+	memcpy(mRecordHeap[index]->data,tempbuf,mRecordFramesize);
+	mRecordBufferState[index]=1;
+
+        // Notify the client of a new frame.
+        if (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME) {
+	    mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME,mRecordHeap[index], 0, mCallbackCookie);
+        } else {
+		mCamera->ReleaseRecordFrame(index);
+        }
+    }
 
     return NO_ERROR;
 }

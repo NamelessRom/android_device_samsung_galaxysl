@@ -676,7 +676,7 @@ int V4L2Camera::StopStreaming ()
     return 0;
 }
 
-void * V4L2Camera::GrabPreviewFrame ()
+void * V4L2Camera::GrabPreviewFrame (int &index)
 {
     int ret;
 
@@ -690,6 +690,8 @@ void * V4L2Camera::GrabPreviewFrame ()
         return NULL;
     }
     nDequeued++;
+
+    index=videoIn->buf.index;
 
     ret = ioctl(camHandle, VIDIOC_QBUF, &videoIn->buf);
     nQueued++;

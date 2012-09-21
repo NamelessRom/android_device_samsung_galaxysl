@@ -129,7 +129,7 @@ public:
 	int getSaturation(void);
 
 
-    void * GrabPreviewFrame ();
+    void * GrabPreviewFrame (int& index);
     void * GrabRecordFrame (int& index);
     void ReleaseRecordFrame (int index);
     void GrabRawFrame(void *previewBuffer, unsigned int width, unsigned int height);
