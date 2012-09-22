@@ -1171,9 +1171,9 @@ int V4L2Camera::cancelAutofocus(void)
         return -1;
     }
 
-    /* AF_STOP restores the sensor focus state to default. However,
-       unlike ICS, JB handles Autofocus differently.*/
-    if(!mAutofocusRunning)
+    /* AF_STOP restores the sensor focus state to default. Hence,
+       we only use AF_STOP only when Autofocus is currently running */
+    if(mAutofocusRunning)
     {
     	if (v4l2_s_ctrl(camHandle, V4L2_CID_AF, AF_STOP) < 0) {
         	ALOGE("ERR(%s):Fail on V4L2_CID_CAMERA_SET_AUTO_FOCUS", __func__);
