@@ -116,7 +116,7 @@ CameraHardware::CameraHardware(int CameraID)
 	if (!mGrallocHal) {
 		ret = hw_get_module(GRALLOC_HARDWARE_MODULE_ID, (const hw_module_t **)&mGrallocHal);
 	if (ret)
-		LOGE("ERR(%s):Fail on loading gralloc HAL", __func__);
+		ALOGE("ERR(%s):Fail on loading gralloc HAL", __func__);
 	}
 
     	mExitAutoFocusThread = false;
@@ -411,7 +411,7 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
     }
 
     if (mPreviewRunning && mPreviewStartDeferred) {
-        LOGV("start/resume preview");
+        ALOGV("start/resume preview");
         status_t ret = startPreviewInternal();
         if (ret == OK) {
             mPreviewStartDeferred = false;
@@ -483,21 +483,21 @@ static void showFPS(const char *tag)
 
 int CameraHardware::previewThreadWrapper()
 {
-    LOGI("%s: starting", __func__);
+    ALOGI("%s: starting", __func__);
     while (1) {
         mPreviewLock.lock();
         while (!mPreviewRunning) {
-            LOGI("%s: calling mCamera->stopPreview() and waiting", __func__);
+            ALOGI("%s: calling mCamera->stopPreview() and waiting", __func__);
             mCamera->stopPreview();
             /* signal that we're stopping */
             mPreviewStoppedCondition.signal();
             mPreviewCondition.wait(mPreviewLock);
-            LOGI("%s: return from wait", __func__);
+            ALOGI("%s: return from wait", __func__);
         }
         mPreviewLock.unlock();
 
         if (mExitPreviewThread) {
-            LOGI("%s: exiting", __func__);
+            ALOGI("%s: exiting", __func__);
             mCamera->stopPreview();
             return 0;
         }
@@ -600,7 +600,7 @@ status_t CameraHardware::startPreview()
     mPreviewLock.lock();
     if (mPreviewRunning) {
         // already running
-        LOGE("%s : preview thread already running", __func__);
+        ALOGE("%s : preview thread already running", __func__);
         mPreviewLock.unlock();
         return INVALID_OPERATION;
     }
@@ -723,7 +723,7 @@ void CameraHardware::stopPreview()
 bool CameraHardware::previewEnabled()
 {
     Mutex::Autolock lock(mPreviewLock);
-    LOGV("%s : %d", __func__, mPreviewRunning);
+    ALOGV("%s : %d", __func__, mPreviewRunning);
     return mPreviewRunning;
 }
 
