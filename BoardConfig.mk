@@ -53,8 +53,7 @@ BOARD_HAS_LARGE_FILESYSTEM := true
 TARGET_USE_CUSTOM_LUN_FILE_PATH := "/sys/class/android_usb/android0/f_mass_storage/lun%d/file"
 
 # Releasetools
-TARGET_RELEASETOOL_OTA_FROM_TARGET_SCRIPT := ./device/samsung/galaxysl/releasetools/galaxysl_ota_from_target_files
-TARGET_RELEASETOOL_IMG_FROM_TARGET_SCRIPT := ./device/samsung/galaxysl/releasetools/galaxysl_img_from_target_files
+TARGET_RELEASETOOLS_EXTENSIONS := device/samsung/galaxysl
 
 # Bluetooth
 BOARD_HAVE_BLUETOOTH := true
