@@ -16,7 +16,6 @@
 PRODUCT_COPY_FILES := \
 	device/samsung/galaxysl/etc/asound.conf:system/etc/asound.conf \
 	device/samsung/galaxysl/etc/gps.conf:system/etc/gps.conf \
-	device/samsung/galaxysl/etc/nvram_net.txt:system/etc/nvram_net.txt \
 	device/samsung/galaxysl/etc/gps.xml:system/vendor/etc/gps.xml \
 	device/samsung/galaxysl/etc/vold.fstab:system/etc/vold.fstab \
 	device/samsung/galaxysl/egl.cfg:system/lib/egl/egl.cfg
@@ -24,6 +23,7 @@ PRODUCT_COPY_FILES := \
 # Init files
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/init.latona.rc:root/init.latona.rc \
+	device/samsung/galaxysl/init.latona.usb.rc:root/init.latona.usb.rc \
 	device/samsung/galaxysl/lpm.rc:root/lpm.rc \
 	device/samsung/galaxysl/lpm.rc:recovery/root/lpm.rc \
 	device/samsung/galaxysl/ueventd.latona.rc:root/ueventd.latona.rc \
@@ -87,50 +87,90 @@ PRODUCT_COPY_FILES += \
  
 # configuration files
 PRODUCT_COPY_FILES += \
-    device/samsung/galaxysl/etc/media_profiles.xml:system/etc/media_profiles.xml
+    device/samsung/galaxysl/etc/media_profiles.xml:system/etc/media_profiles.xml \
+    device/samsung/galaxysl/etc/media_codecs.xml:system/etc/media_codecs.xml
+
+#Bluetooth configuration files
+PRODUCT_COPY_FILES += \
+    device/samsung/galaxysl/etc/bluetooth/main.conf:system/etc/bluetooth/main.conf
 
 # Prebuilt kl keymaps
 PRODUCT_COPY_FILES += \
-	device/samsung/galaxysl/keylayout/sec_jack.kl:system/usr/keylayout/sec_jack.kl \
-	device/samsung/galaxysl/keylayout/sec_key.kl:system/usr/keylayout/sec_key.kl \
-	device/samsung/galaxysl/keylayout/sec_power_key.kl:system/usr/keylayout/sec_power_key.kl \
-	device/samsung/galaxysl/keylayout/sec_touchscreen.kl:system/usr/keylayout/sec_touchscreen.kl
-
-# IDC file for Touchscreen Calibration
+       device/samsung/galaxysl/usr/keylayout/sec_jack.kl:system/usr/keylayout/sec_jack.kl \
+       device/samsung/galaxysl/usr/keylayout/sec_key.kl:system/usr/keylayout/sec_key.kl \
+       device/samsung/galaxysl/usr/keylayout/sec_power_key.kl:system/usr/keylayout/sec_power_key.kl \
+       device/samsung/galaxysl/usr/keylayout/sec_touchscreen.kl:system/usr/keylayout/sec_touchscreen.kl
+ 
+ # IDC file for Touchscreen Calibration
 PRODUCT_COPY_FILES += \
-	device/samsung/galaxysl/sec_touchscreen.idc:system/usr/idc/sec_touchscreen.idc
+       device/samsung/galaxysl/usr/idc/sec_touchscreen.idc:system/usr/idc/sec_touchscreen.idc
 
 # These are the hardware-specific features
 PRODUCT_COPY_FILES += \
-	frameworks/base/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
-	frameworks/base/data/etc/android.hardware.camera.autofocus.xml:system/etc/permissions/android.hardware.camera.autofocus.xml \
-	frameworks/base/data/etc/android.hardware.camera.front.xml:system/etc/permissions/android.hardware.camera.front.xml \
-	frameworks/base/data/etc/android.hardware.telephony.gsm.xml:system/etc/permissions/android.hardware.telephony.gsm.xml \
-	frameworks/base/data/etc/android.hardware.location.xml:system/etc/permissions/android.hardware.location.xml \
-	frameworks/base/data/etc/android.hardware.location.gps.xml:system/etc/permissions/android.hardware.location.gps.xml \
-	frameworks/base/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml \
-	frameworks/base/data/etc/android.hardware.sensor.proximity.xml:system/etc/permissions/android.hardware.sensor.proximity.xml \
-	frameworks/base/data/etc/android.hardware.sensor.light.xml:system/etc/permissions/android.hardware.sensor.light.xml \
-	frameworks/base/data/etc/android.hardware.sensor.gyroscope.xml:system/etc/permissions/android.hardware.sensor.gyroscope.xml \
-	frameworks/base/data/etc/android.hardware.usb.accessory.xml:system/etc/permissions/android.hardware.usb.accessory.xml \
-	frameworks/base/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
-	frameworks/base/data/etc/android.hardware.touchscreen.multitouch.jazzhand.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.jazzhand.xml \
-	frameworks/base/data/etc/android.hardware.touchscreen.multitouch.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.xml \
-	frameworks/base/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml
+	frameworks/native/data/etc/handheld_core_hardware.xml:system/etc/permissions/handheld_core_hardware.xml \
+	frameworks/native/data/etc/android.hardware.camera.autofocus.xml:system/etc/permissions/android.hardware.camera.autofocus.xml \
+	frameworks/native/data/etc/android.hardware.camera.front.xml:system/etc/permissions/android.hardware.camera.front.xml \
+	frameworks/native/data/etc/android.hardware.telephony.gsm.xml:system/etc/permissions/android.hardware.telephony.gsm.xml \
+	frameworks/native/data/etc/android.hardware.location.xml:system/etc/permissions/android.hardware.location.xml \
+	frameworks/native/data/etc/android.hardware.location.gps.xml:system/etc/permissions/android.hardware.location.gps.xml \
+	frameworks/native/data/etc/android.hardware.wifi.xml:system/etc/permissions/android.hardware.wifi.xml \
+	frameworks/native/data/etc/android.hardware.sensor.proximity.xml:system/etc/permissions/android.hardware.sensor.proximity.xml \
+	frameworks/native/data/etc/android.hardware.sensor.light.xml:system/etc/permissions/android.hardware.sensor.light.xml \
+	frameworks/native/data/etc/android.hardware.sensor.gyroscope.xml:system/etc/permissions/android.hardware.sensor.gyroscope.xml \
+	frameworks/native/data/etc/android.hardware.usb.accessory.xml:system/etc/permissions/android.hardware.usb.accessory.xml \
+	frameworks/native/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
+	frameworks/native/data/etc/android.hardware.touchscreen.multitouch.jazzhand.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.jazzhand.xml \
+	frameworks/native/data/etc/android.hardware.touchscreen.multitouch.xml:system/etc/permissions/android.hardware.touchscreen.multitouch.xml \
+	frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml
 
 # Packages
 PRODUCT_PACKAGES := \
     lights.latona \
     com.android.future.usb.accessory \
     bdaddr_read \
-    utility_make_ext4fs \
-    bootmenu_busybox
+    bootmenu_busybox \
+    SamsungServiceMode \
+    DeviceParts
+
+#Filesystem binaries
+PRODUCT_PACKAGES += \
+    bml_over_mtd \
+    utility_make_ext4fs
 
 # ICS sound
 PRODUCT_PACKAGES += \
 	hcitool hciattach hcidump \
 	libaudioutils audio.a2dp.default audio_policy.latona \
-	libaudiohw_legacy audio.primary.omap3
+	libaudiohw_legacy audio.primary.omap3 audio.usb.default
+
+PRODUCT_COPY_FILES += \
+	device/samsung/galaxysl/libaudio/audio_policy.conf:system/etc/audio_policy.conf
+
+# HWComposer
+PRODUCT_PACKAGES += hwcomposer.default
+
+#Camera
+PRODUCT_PACKAGES += camera.latona
+
+# OMX stuff
+PRODUCT_PACKAGES += \
+    libLCML \
+    libbridge \
+    cexec.out \
+    libOMX.TI.AAC.decode \
+    libOMX.TI.AAC.encode \
+    libOMX.TI.AMR.decode \
+    libOMX.TI.AMR.encode \
+    libOMX.TI.JPEG.decoder \
+    libOMX.TI.JPEG.encoder \
+    libOMX.TI.MP3.decode \
+    libOMX.TI.Video.Decoder \
+    libOMX.TI.Video.encoder \
+    libOMX.TI.VPP \
+    libOMX.TI.WBAMR.decode \
+    libOMX.TI.WBAMR.encode \
+    libOMX.TI.WMA.decode \
+    libOMX_Core \
 
 # device specific overlays
 DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
@@ -149,9 +189,12 @@ PRODUCT_PROPERTY_OVERRIDES += \
        ro.telephony.ril_class=SamsungRIL \
        ro.telephony.ril.v3=icccardstatus,datacall,signalstrength,facilitylock \
        mobiledata.interfaces=pdp0,eth0,gprs,ppp0 \
-       dalvik.vm.heapsize=64m \
-       persist.service.usb.setting=0 \
        dev.sfbootcomplete=0
+
+
+# Set default USB interface
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+    persist.sys.usb.config=mass_storage
 
 # enable Google-specific location features,
 # like NetworkLocationProvider and LocationCollector
@@ -167,18 +210,32 @@ PRODUCT_TAGS += \
 PRODUCT_PROPERTY_OVERRIDES += \
         dalvik.vm.dexopt-data-only=1
 
+# Extended JNI checks
+# The extended JNI checks will cause the system to run more slowly, but they can spot a variety of nasty bugs
+# before they have a chance to cause problems.
+# Default=true for development builds, set by android buildsystem.
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.kernel.android.checkjni=0 \
+    dalvik.vm.checkjni=false
+
+# Override /proc/sys/vm/dirty_ratio on UMS
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.vold.umsdirtyratio=20
+
+# Vold
+PRODUCT_PROPERTY_OVERRIDES += \
+	ro.vold.switchablepair=/mnt/emmc,/mnt/sdcard
+
+PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+	persist.sys.vold.switchexternal=1
+
+include frameworks/native/build/phone-hdpi-512-dalvik-heap.mk
+
 # Screen density is actually considered a locale (since it is taken into account
 # the the build-time selection of resources). The product definitions including
 # this file must pay attention to the fact that the first entry in the final
 # PRODUCT_LOCALES expansion must not be a density.
 PRODUCT_LOCALES := hdpi
-
-# kernel modules for ramdisk
-PRODUCT_COPY_FILES += \
-	$(call find-copy-subdir-files,*,device/samsung/galaxysl/modules/ramdisk,root/lib/modules)
-
-PRODUCT_COPY_FILES += \
-	$(call find-copy-subdir-files,*,device/samsung/galaxysl/modules/ramdisk,recovery/root/lib/modules)
 
 # other kernel modules not in ramdisk
 PRODUCT_COPY_FILES += $(foreach module,\
@@ -197,6 +254,10 @@ PRODUCT_COPY_FILES += \
 # copy the filesystem converter
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/updater.sh:updater.sh
+
+# bml_over_mtd
+PRODUCT_COPY_FILES += \
+device/samsung/galaxysl/bml_over_mtd.sh:bml_over_mtd.sh
 
 # See comment at the top of this file. This is where the other
 # half of the device-specific product definition file takes care

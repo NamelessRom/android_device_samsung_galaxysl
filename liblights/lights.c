@@ -65,7 +65,7 @@ write_int(char const* path, int value)
         return amt == -1 ? -errno : 0;
     } else {
         if (already_warned == 0) {
-            LOGE("write_int failed to open %s\n", path);
+            ALOGE("write_int failed to open %s\n", path);
             already_warned = 1;
         }
         return -errno;
@@ -101,35 +101,6 @@ set_light_backlight(struct light_device_t* dev,
 }
 
 static int
-set_light_keyboard(struct light_device_t* dev,
-        struct light_state_t const* state)
-{
-    return 0;
-}
-
-static int
-set_light_buttons(struct light_device_t* dev,
-        struct light_state_t const* state)
-{
-    int err = 0;
-    int on = is_lit(state);
-
-    LOGD("set_light_button on=%d\n", on ? 255 : 0);
-    pthread_mutex_lock(&g_lock);
-    err = write_int(BUTTON_FILE, on ? 255:0);
-    pthread_mutex_unlock(&g_lock);
-
-    return err;
-}
-
-static int
-set_light_battery(struct light_device_t* dev,
-        struct light_state_t const* state)
-{
-    return 0;
-}
-
-static int
 set_light_notification(struct light_device_t* dev,
         struct light_state_t const* state)
 {
@@ -152,18 +123,11 @@ set_light_notification(struct light_device_t* dev,
             v = 0;
     }
 
-    LOGD("set_light_notification on=%d\n", v);
+    ALOGD("set_light_notification on=%d\n", v);
     err = write_int(BUTTON_FILE, v);
     pthread_mutex_unlock(&g_lock);
 
     return err;
-}
-
-static int
-set_light_attention(struct light_device_t* dev,
-        struct light_state_t const* state)
-{
-    return 0;
 }
 
 static int
@@ -186,20 +150,8 @@ static int open_lights(const struct hw_module_t* module, char const* name,
     if (0 == strcmp(LIGHT_ID_BACKLIGHT, name)) {
         set_light = set_light_backlight;
     }
-    else if (0 == strcmp(LIGHT_ID_KEYBOARD, name)) {
-        set_light = set_light_keyboard;
-    }
-    else if (0 == strcmp(LIGHT_ID_BUTTONS, name)) {
-        set_light = set_light_buttons;
-    }
-    else if (0 == strcmp(LIGHT_ID_BATTERY, name)) {
-        set_light = set_light_battery;
-    }
     else if (0 == strcmp(LIGHT_ID_NOTIFICATIONS, name)) {
         set_light = set_light_notification;
-    }
-    else if (0 == strcmp(LIGHT_ID_ATTENTION, name)) {
-        set_light = set_light_attention;
     }
     else {
         return -EINVAL;
@@ -225,7 +177,7 @@ static struct hw_module_methods_t lights_module_methods = {
     .open =  open_lights,
 };
 
-const struct hw_module_t HAL_MODULE_INFO_SYM = {
+struct hw_module_t HAL_MODULE_INFO_SYM = {
     .tag = HARDWARE_MODULE_TAG,
     .version_major = 1,
     .version_minor = 0,
@@ -234,3 +186,4 @@ const struct hw_module_t HAL_MODULE_INFO_SYM = {
     .author = "Google, Inc.",
     .methods = &lights_module_methods,
 };
+
