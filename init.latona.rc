@@ -59,18 +59,6 @@ on fs
 
     mount debugfs debugfs /debug
 
-    # additional kernel modules
-    insmod /system/lib/modules/samsung_battery.ko
-    insmod /system/lib/modules/Si4709_driver.ko
-    insmod /system/lib/modules/yas_mag_kernel_driver.ko
-    insmod /system/lib/modules/yas_acc_kernel_driver.ko
-    insmod /system/lib/modules/yas_ori_kernel_driver.ko
-    insmod /system/lib/modules/gp2a.ko
-    insmod /system/lib/modules/gps.ko
-    insmod /system/lib/modules/storage.ko
-    insmod /system/lib/modules/vibetonz.ko
-    insmod /system/lib/modules/switch_sio.ko
-
 on post-fs
 
     # symlink for SamsungRIL

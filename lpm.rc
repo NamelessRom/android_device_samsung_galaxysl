@@ -34,8 +34,6 @@ on fs
 # mount rfs partitions
     mount yaffs2 mtd@system /system ro
 
-    insmod /system/lib/modules/samsung_battery.ko
-
 # We chown/chmod /data again so because mount is run as root + defaults 
     mount ext4 /dev/block/mmcblk0p3 /data nosuid nodev noatime
 
@@ -48,8 +46,6 @@ on post-fs
     chmod 0777 /data/anr	
 
 # install switch_sio driver
-    insmod /system/lib/modules/switch_sio.ko
-
     # Enabling sleep in idle path
     write /debug/pm_debug/sleep_while_idle 1
 
