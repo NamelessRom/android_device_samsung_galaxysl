@@ -237,20 +237,6 @@ include frameworks/native/build/phone-hdpi-512-dalvik-heap.mk
 # PRODUCT_LOCALES expansion must not be a density.
 PRODUCT_LOCALES := hdpi
 
-# other kernel modules not in ramdisk
-PRODUCT_COPY_FILES += $(foreach module,\
-	$(filter-out $(RAMDISK_MODULES),$(wildcard device/samsung/galaxysl/modules/*.ko)),\
-	$(module):system/lib/modules/$(notdir $(module)))
-
-ifeq ($(TARGET_PREBUILT_KERNEL),)
-    LOCAL_KERNEL := device/samsung/galaxysl/kernel
-else
-    LOCAL_KERNEL := $(TARGET_PREBUILT_KERNEL)
-endif
-
-PRODUCT_COPY_FILES += \
-    $(LOCAL_KERNEL):kernel
-
 # copy the filesystem converter
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/updater.sh:updater.sh
