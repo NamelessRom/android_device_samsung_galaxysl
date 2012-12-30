@@ -8,7 +8,7 @@ TARGET_CPU_ABI := armeabi-v7a
 TARGET_CPU_ABI2 := armeabi
 TARGET_ARCH_VARIANT := armv7-a-neon
 ARCH_ARM_HAVE_TLS_REGISTER := true
-COMMON_GLOBAL_CFLAGS += -DOMAP_COMPAT -DOMAP_ENHANCEMENT -DTARGET_OMAP3
+COMMON_GLOBAL_CFLAGS += -DOMAP_ENHANCEMENT -DTARGET_OMAP3 -DOMAP_ENHANCEMENT_CPCAM -DOMAP_ENHANCEMENT_VTC
 
 TARGET_BOOTANIMATION_PRELOAD := true
 
@@ -58,15 +58,6 @@ BOARD_HAVE_BLUETOOTH := true
 BOARD_EGL_CFG := device/samsung/galaxysl/egl.cfg
 COMMON_GLOBAL_CFLAGS += -DSURFACEFLINGER_FORCE_SCREEN_RELEASE
 USE_OPENGL_RENDERER := true
-
-# TARGET_DISABLE_TRIPLE_BUFFERING can be used to disable triple buffering
-# on per target basis. On crespo it is possible to do so in theory
-# to save memory, however, there are currently some limitations in the
-# OpenGL ES driver that in conjunction with disable triple-buffering
-# would hurt performance significantly (see b/6016711)
-TARGET_DISABLE_TRIPLE_BUFFERING := false
-
-BOARD_ALLOW_EGL_HIBERNATION := true
 
 # OMX Stuff
 HARDWARE_OMX := true
