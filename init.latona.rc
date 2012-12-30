@@ -130,6 +130,13 @@ on post-fs-data
     chown system system /dev/video1
     chmod 0660 /dev/video1
 
+# ISP Resizer DSSCOMP
+    chmod 0777 /sys/devices/platform/dsscomp/isprsz/enable
+# DSSCOMP - HWC
+    chmod 0777 /dev/dsscomp
+# ION - MEMORY ALLOCATOR
+    chmod 0777 /dev/ion
+
 # change permissions for overlay managers and display devices
     chmod 0777 /sys/devices/platform/omapdss/manager0/name
     chmod 0777 /sys/devices/platform/omapdss/manager1/name
