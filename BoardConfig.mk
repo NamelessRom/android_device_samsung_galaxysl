@@ -58,6 +58,7 @@ TARGET_RELEASETOOL_IMG_FROM_TARGET_SCRIPT := ./device/samsung/galaxysl/releaseto
 
 # Bluetooth
 BOARD_HAVE_BLUETOOTH := true
+BOARD_WPAN_DEVICE := true
 
 # Egl
 BOARD_EGL_CFG := device/samsung/galaxysl/egl.cfg
