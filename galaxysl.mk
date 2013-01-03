@@ -139,7 +139,7 @@ PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/libaudio/audio_policy.conf:system/etc/audio_policy.conf
 
 # HWComposer
-PRODUCT_PACKAGES += hwcomposer.default
+PRODUCT_PACKAGES += hwcomposer.latona
 
 #Camera
 PRODUCT_PACKAGES += camera.latona
