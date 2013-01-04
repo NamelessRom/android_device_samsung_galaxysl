@@ -62,6 +62,8 @@ on post-fs
 
     # symlink for SamsungRIL
     symlink /radio/modem.bin /dev/block/bml13
+    # symlink for SAMSUNG IPC UART
+    symlink /dev/ttyO0 /dev/ttyS0
 
 on post-fs-data
 # permission for dvfslock ctrl
