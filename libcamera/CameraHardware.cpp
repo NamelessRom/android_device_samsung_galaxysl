@@ -41,6 +41,7 @@
 #define CAMERA_FF 1
 
 #define PIX_YUV422I 0
+#define HAL_PIXEL_FORMAT_YUV     0x1B
 
 static const int INITIAL_SKIP_FRAME = 3;
 
@@ -435,12 +436,12 @@ int CameraHardware::setPreviewWindow( preview_stream_ops_t *window)
     int width, height;
     mParameters.getPreviewSize(&width, &height);
     mNativeWindow=window;
-    mNativeWindow->set_usage(mNativeWindow,GRALLOC_USAGE_SW_WRITE_OFTEN);
+    mNativeWindow->set_usage(mNativeWindow,CAMHAL_GRALLOC_USAGE);
     mNativeWindow->set_buffers_geometry(
                 mNativeWindow,
                 width,
                 height,
-                HAL_PIXEL_FORMAT_YV12);
+                HAL_PIXEL_FORMAT_YUV);
     err = mNativeWindow->set_buffer_count(mNativeWindow, NB_BUFFER);
     if (err != 0) {
         ALOGE("native_window_set_buffer_count failed: %s (%d)", strerror(-err), -err);
@@ -548,70 +549,70 @@ int CameraHardware::previewThreadWrapper()
 
 int CameraHardware::previewThread()
 {
-    int index;
-    nsecs_t timestamp;
-    struct addrs *addrs;
+	int index;
+	nsecs_t timestamp;
+	struct addrs *addrs;
 
-    void * tempbuf=mCamera->GrabPreviewFrame(index);
+	void * tempbuf=mCamera->GrabPreviewFrame(index);
 
-//  LOGV("%s: index %d", __func__, index);
+//	LOGV("%s: index %d", __func__, index);
 
-    mSkipFrameLock.lock();
-    if (mSkipFrame > 0) {
-        mSkipFrame--;
-        mSkipFrameLock.unlock();
-        ALOGV("%s: index %d skipping frame", __func__, index);
-        return NO_ERROR;
-    }
-    mSkipFrameLock.unlock();
+	mSkipFrameLock.lock();
+	if (mSkipFrame > 0) {
+		mSkipFrame--;
+		mSkipFrameLock.unlock();
+		ALOGV("%s: index %d skipping frame", __func__, index);
+		return NO_ERROR;
+	}
+	mSkipFrameLock.unlock();
 
-    timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
+	timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
-    int width, height, frame_size;
+	int width, height, frame_size;
 
-    mParameters.getPreviewSize(&width, &height);
-    frame_size = width * height * 1.5;
+	mParameters.getPreviewSize(&width, &height);
+	frame_size = width * height * 1.5;
 
 	int framesize_yuv=width * height * 2;
 
-    if (mNativeWindow && mGrallocHal) {
-        buffer_handle_t *buf_handle;
-        int stride;
-        if (0 != mNativeWindow->dequeue_buffer(mNativeWindow, &buf_handle, &stride)) {
-            ALOGE("Could not dequeue gralloc buffer!\n");
-            goto callbacks;
-        }
-
-        void *vaddr;
-        if (!mGrallocHal->lock(mGrallocHal,
-                               *buf_handle,
-                               GRALLOC_USAGE_SW_WRITE_OFTEN,
-                               0, 0, width, height, &vaddr)) {
-		if(mCameraID==CAMERA_FF){
-			camera_memory_t* mScaleHeap = mRequestMemory(-1, framesize_yuv, 1, NULL);
-			if(scale_process((void*)tempbuf, PREVIEW_WIDTH, PREVIEW_HEIGHT,(void*)mScaleHeap->data, PREVIEW_HEIGHT, PREVIEW_WIDTH, 0, PIX_YUV422I, 1))
-			{
-				ALOGE("scale_process() failed\n");
-			}
-						neon_args->pIn = (uint8_t*)mScaleHeap->data;
-						neon_args->pOut = (uint8_t*)tempbuf;
-						neon_args->width = PREVIEW_HEIGHT;
-						neon_args->height = PREVIEW_WIDTH;
-						neon_args->rotate = NEON_ROT90;
-						int error = 0;
-						if (Neon_Rotate != NULL)
-							error = (*Neon_Rotate)(neon_args);
-						else
-							ALOGE("Rotate Fucntion pointer Null");
-
-						if (error < 0) {
-							ALOGE("Error in Rotation 90");
-
-						}
-			mScaleHeap->release(mScaleHeap);
+	if (mNativeWindow && mGrallocHal) {
+		buffer_handle_t *buf_handle;
+		int stride;
+		if (0 != mNativeWindow->dequeue_buffer(mNativeWindow, &buf_handle, &stride)) {
+			ALOGE("Could not dequeue gralloc buffer!\n");
+			goto callbacks;
 		}
-			yuv422_to_YV12((unsigned char *)tempbuf,(unsigned char *)vaddr, width, height);
-            mGrallocHal->unlock(mGrallocHal, *buf_handle);
+
+		void *vaddr;
+		if (!mGrallocHal->lock(mGrallocHal,
+                               *buf_handle,
+                               CAMHAL_GRALLOC_USAGE,
+                               0, 0, width, height, &vaddr)) {
+			if(mCameraID==CAMERA_FF){
+				camera_memory_t* mScaleHeap = mRequestMemory(-1, framesize_yuv, 1, NULL);
+				if(scale_process((void*)tempbuf, PREVIEW_WIDTH, PREVIEW_HEIGHT,(void*)mScaleHeap->data, PREVIEW_HEIGHT, PREVIEW_WIDTH, 0, PIX_YUV422I, 1))
+				{
+					ALOGE("scale_process() failed\n");
+				}
+				neon_args->pIn = (uint8_t*)mScaleHeap->data;
+				neon_args->pOut = (uint8_t*)tempbuf;
+				neon_args->width = PREVIEW_HEIGHT;
+				neon_args->height = PREVIEW_WIDTH;
+				neon_args->rotate = NEON_ROT90;
+				int error = 0;
+				if (Neon_Rotate != NULL)
+					error = (*Neon_Rotate)(neon_args);
+				else
+					ALOGE("Rotate Function pointer Null");
+
+				if (error < 0) {
+					ALOGE("Error in Rotation 90");
+
+				}
+				mScaleHeap->release(mScaleHeap);
+			}
+		memcpy((unsigned char *)vaddr, (unsigned char *)tempbuf,framesize_yuv);
+		mGrallocHal->unlock(mGrallocHal, *buf_handle);
         }
         else
             ALOGE("%s: could not obtain gralloc buffer", __func__);
@@ -623,38 +624,38 @@ int CameraHardware::previewThread()
     }
 
 callbacks:
-    // Notify the client of a new frame.
-    if (mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) {
-        const char * preview_format = mParameters.getPreviewFormat();
-	camera_memory_t* picture = mRequestMemory(-1, frame_size, 1, NULL);
-        if (!strcmp(preview_format, CameraParameters::PIXEL_FORMAT_YUV420SP)) {
-	    Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
-        }
-        mDataCb(CAMERA_MSG_PREVIEW_FRAME, picture, index, NULL, mCallbackCookie);
+	// Notify the client of a new frame.
+	if (mMsgEnabled & CAMERA_MSG_PREVIEW_FRAME) {
+		const char * preview_format = mParameters.getPreviewFormat();
+		camera_memory_t* picture = mRequestMemory(-1, frame_size, 1, NULL);
+		if (!strcmp(preview_format, CameraParameters::PIXEL_FORMAT_YUV420SP)) {
+		    Neon_Convert_yuv422_to_NV21((unsigned char *)tempbuf, (unsigned char*)picture->data, width, height);
+		}
+		mDataCb(CAMERA_MSG_PREVIEW_FRAME, picture, index, NULL, mCallbackCookie);
 		picture->release(picture);
-    }
+	}
 
-    Mutex::Autolock lock(mRecordingLock);
-    if (mRecordingEnabled == true) {
-        tempbuf=mCamera->GrabRecordFrame(index);
-        if (index < 0) {
-            ALOGE("ERR(%s):Fail on mCamera->GrabRecordFrame()", __func__);
-            return UNKNOWN_ERROR;
-        }
+	Mutex::Autolock lock(mRecordingLock);
+	if (mRecordingEnabled == true) {
+		tempbuf=mCamera->GrabRecordFrame(index);
+		if (index < 0) {
+			ALOGE("ERR(%s):Fail on mCamera->GrabRecordFrame()", __func__);
+			return UNKNOWN_ERROR;
+		}
 
-	int mRecordFramesize = width * height * 2;
-	memcpy(mRecordHeap[index]->data,tempbuf,mRecordFramesize);
-	mRecordBufferState[index]=1;
+		int mRecordFramesize = width * height * 2;
+		memcpy(mRecordHeap[index]->data,tempbuf,mRecordFramesize);
+		mRecordBufferState[index]=1;
 
-        // Notify the client of a new frame.
-        if (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME) {
-	    mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME,mRecordHeap[index], 0, mCallbackCookie);
-        } else {
-		mCamera->ReleaseRecordFrame(index);
-        }
-    }
+		// Notify the client of a new frame.
+		if (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME) {
+			mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME,mRecordHeap[index], 0, mCallbackCookie);
+		} else {
+			mCamera->ReleaseRecordFrame(index);
+		}
+	}
 
-    return NO_ERROR;
+	return NO_ERROR;
 }
 
 status_t CameraHardware::startPreview()
