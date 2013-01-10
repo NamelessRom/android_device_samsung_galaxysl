@@ -354,8 +354,8 @@ on post-fs-data
     chown system input /sys/class/input/input9/testmode    
 
 # Permissions for bluetooth.
-    chmod 0660 /dev/ttyO1
-    chown bluetooth bluetooth /dev/ttyO1
+    chmod 0660 /dev/ttyS1
+    chown bluetooth bluetooth /dev/ttyS1
     chmod 0660 /sys/class/rfkill/rfkill0/state
     chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
     chown bluetooth bluetooth /sys/class/rfkill/rfkill0/type
