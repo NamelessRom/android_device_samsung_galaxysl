@@ -121,6 +121,7 @@ PRODUCT_PACKAGES := \
     uim-sysfs \
     bootmenu_busybox \
     SamsungServiceMode \
+    hostapd.conf \
     DeviceParts
 
 #Filesystem binaries
