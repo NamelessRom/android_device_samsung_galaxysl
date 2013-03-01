@@ -10,3 +10,6 @@ ro.HOME_APP_ADJ=1
 # CWM key repeat
 ro.cwm.enable_key_repeat=true
 ro.cwm.repeatable_keys=115,114,158
+
+## Limit activities
+sys.mem.max_hidden_apps=5
