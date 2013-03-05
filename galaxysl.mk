@@ -204,10 +204,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
        dev.sfbootcomplete=0
 
 
-# Set default USB interface
-PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
-    persist.sys.usb.config=mass_storage
-
 # enable Google-specific location features,
 # like NetworkLocationProvider and LocationCollector
 PRODUCT_PROPERTY_OVERRIDES += \
