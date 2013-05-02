@@ -25,3 +25,4 @@
 /dev/omap-previewer	      0660	 system		system
 /dev/omap-resizer	      0660	 system		system
 /dev/fmradio		      0660	 system		system
+/dev/hci_tty		      0600	 bluetooth	bluetooth

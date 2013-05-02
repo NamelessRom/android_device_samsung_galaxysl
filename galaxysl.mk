@@ -118,6 +118,7 @@ PRODUCT_PACKAGES := \
     com.android.future.usb.accessory \
     bdaddr_read \
     uim-sysfs \
+    libbt-vendor \
     bootmenu_busybox \
     SamsungServiceMode \
     hostapd.conf \
