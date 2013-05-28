@@ -359,10 +359,7 @@ on post-fs-data
     chmod 0660 /sys/class/rfkill/rfkill0/state
     chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/state
     chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/type
-
-# enable touch boost
-    write /sys/touchscreen/touch_boost 1
-    
+   
 # Touchscreen fix (waleedq)
     write /sys/touchscreen/settings/set_touchscreen 7032
     write /sys/touchscreen/settings/set_noise 4027
