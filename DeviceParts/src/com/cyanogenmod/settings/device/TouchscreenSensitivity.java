@@ -14,9 +14,9 @@ import android.widget.TextView;
 
 public class TouchscreenSensitivity extends DialogPreference implements OnClickListener {
 
-    private static final String FILE_APPLY = "/sys/touchscreen/set_write";
+    private static final String FILE_APPLY = "/sys/touchscreen/settings/set_write";
 
-    private static final String FILE_PATH = "/sys/touchscreen/set_touchscreen";
+    private static final String FILE_PATH = "/sys/touchscreen/settings/set_touchscreen";
     private static final String KEY_VALUE = "7";
     private static final int DEFAULT_VALUE = 32;
     private static final int MAX_VALUE = 70;

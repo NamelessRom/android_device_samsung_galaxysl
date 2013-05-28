@@ -42,9 +42,6 @@ public class DeviceSettings extends FragmentActivity {
     public static final String KEY_TOUCHKEYS_TIMEOUT_DISABLED = "touchkeys_timeout_disabled";
     public static final String KEY_TOUCHKEYS_TIMEOUT = "touchkeys_timeout";
     public static final String KEY_VIBRATOR_INTENSITY = "vibrator_intensity";
-    public static final String KEY_CPU_BOOST_FREQ = "cpu_boost_freq";
-    public static final String KEY_FSYNC = "fsync";
-    public static final String KEY_BATTERY_WORK_DELAY = "battery_work_delay";
 
     ViewPager mViewPager;
     TabsAdapter mTabsAdapter;
@@ -67,8 +64,6 @@ public class DeviceSettings extends FragmentActivity {
                 GeneralFragmentActivity.class, null);
         mTabsAdapter.addTab(bar.newTab().setText(R.string.category_screen_title),
                 ScreenFragmentActivity.class, null);
-        mTabsAdapter.addTab(bar.newTab().setText(R.string.category_advanced_title),
-                AdvancedFragmentActivity.class, null);
 
         if (savedInstanceState != null) {
             bar.setSelectedNavigationItem(savedInstanceState.getInt("tab", 0));

@@ -5,7 +5,6 @@
     <!-- Tabs -->
     <string name="category_general_title">General</string>
     <string name="category_screen_title">Screen</string>
-    <string name="category_advanced_title">Advanced</string>
 
     <!-- Screen -->
     <string name="seekbar_btn_default_title">Default</string>
@@ -48,22 +47,5 @@
     <string name="hspa_subcat_title">Radio</string>
     <string name="hspa_title_head">HSPA</string>
     <string name="hspa_summary_head">Enable HSDPA/HSUPA</string>
-
-    <!-- CPU boost -->
-    <string name="cpu_boost_freq_subcat_title">CPU</string>
-    <string name="cpu_boost_freq_title_head">Boost</string>
-    <string name="cpu_boost_freq_summary_head">Change boosting freq</string>
-    <string name="cpu_boost_freq_notsupported">CPU governor not supported</string>
-
-    <!-- FSync -->
-    <string name="fsync_subcat_title">FSync</string>
-    <string name="fsync_title_head">Disable FSync</string>
-    <string name="fsync_summary_head">Improve performance, but it can cause data corruption</string>
-
-    <!-- Battery-monitor work delay -->
-    <string name="battery_delay_subcat_title">Battery Monitor</string>
-    <string name="battery_delay_title_head">Delay</string>
-    <string name="battery_delay_summary_head">Adjust the duration of samsung-battery adding a delay</string>
-    <string name="battery_delay_seekbar_title">Additional delay</string>
 
 </resources>
