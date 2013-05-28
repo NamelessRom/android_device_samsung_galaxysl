@@ -356,10 +356,10 @@ on post-fs-data
 
 # Permissions for bluetooth.
     chmod 0660 /dev/ttyS1
-    chown bluetooth bluetooth /dev/ttyS1
+    chown bluetooth net_bt_stack /dev/ttyS1
     chmod 0660 /sys/class/rfkill/rfkill0/state
-    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
-    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/type
+    chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/state
+    chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/type
 
 # enable touch boost
     write /sys/touchscreen/touch_boost 1
