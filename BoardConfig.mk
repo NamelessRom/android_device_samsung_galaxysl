@@ -31,7 +31,6 @@ TARGET_NO_BOOTLOADER := true
 TARGET_NO_RADIOIMAGE := true
 
 TARGET_PROVIDES_INIT_TARGET_RC := true
-TARGET_RECOVERY_INITRC := device/samsung/galaxysl/recovery.rc
 
 BOARD_NAND_PAGE_SIZE := 4096 -s 128
 BOARD_KERNEL_PAGESIZE := 4096
@@ -52,7 +51,6 @@ BOARD_HAS_NO_MISC_PARTITION := true
 BOARD_HAS_NO_SELECT_BUTTON := true
 TARGET_RECOVERY_PRE_COMMAND := "echo 1 > /cache/.startrecovery; sync;"
 BOARD_CUSTOM_RECOVERY_KEYMAPPING := ../../device/samsung/galaxysl/recovery/recovery_keys.c
-BOARD_CUSTOM_GRAPHICS := ../../../device/samsung/galaxysl/recovery/graphics.c
 BOARD_USES_BML_OVER_MTD := true
 
 # fix this up by examining /proc/mtd on a running device
