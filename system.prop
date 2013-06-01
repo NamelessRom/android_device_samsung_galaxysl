@@ -14,3 +14,6 @@ ro.cwm.repeatable_keys=115,114,158
 
 ## Limit activities
 sys.mem.max_hidden_apps=5
+
+## Enable OMAP stuffs
+com.ti.omap_enhancement=true
