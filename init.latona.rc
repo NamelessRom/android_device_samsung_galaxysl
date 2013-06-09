@@ -368,19 +368,6 @@ on post-fs-data
     chown system system /sys/touchscreen/bootcomplete
     chown system system /sys/touchscreen/set_qt_firm_update
 
-# permissions for MTP device node_temporary permission_will be changed 0660
-    chmod 0660 /dev/usb_mtp_gadget 
-    chown system system /dev/usb_mtp_gadget
-    
-# Permission for USB and UART path
-    chown system radio /sys/devices/platform/switch-sio/uart_sel
-    chown system radio /sys/devices/platform/switch-sio/usb_sel        
-    
-# USB Device permission
-    chown system system /sys/devices/platform/android_usb/UsbMenuSel
-    chown system system /sys/devices/platform/android_usb/tethering    
-    chown system system /sys/devices/platform/i2c_omap.1/i2c-1/1-0048/twl4030_usb/vbus
-
 on boot
 # fake some battery state
     setprop status.battery.state Slow
