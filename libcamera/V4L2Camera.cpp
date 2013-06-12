@@ -271,6 +271,7 @@ int V4L2Camera::Configure(int width,int height,int pixelformat,int fps,int cam_m
 	/*dhiru1602 : use cam_mode to determine if the camera is in Preview or 
 		Capture mode */
 	setFramerate(fps,cam_mode);
+
 	videoIn->width = width;
 	videoIn->height = height;
 	videoIn->framesizeIn =((width * height) << 1);
@@ -278,7 +279,7 @@ int V4L2Camera::Configure(int width,int height,int pixelformat,int fps,int cam_m
 	videoIn->format.fmt.pix.width =width;
 	videoIn->format.fmt.pix.height =height;
 	videoIn->format.fmt.pix.pixelformat = pixelformat;
-	videoIn->format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    	videoIn->format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	do
 	{
 		ret = ioctl(camHandle, VIDIOC_S_FMT, &videoIn->format);
