@@ -116,6 +116,7 @@ PRODUCT_COPY_FILES += \
 # Packages
 PRODUCT_PACKAGES := \
     lights.latona \
+    sensors.latona \
     com.android.future.usb.accessory \
     bdaddr_read \
     uim-sysfs \
