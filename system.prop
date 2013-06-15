@@ -5,7 +5,6 @@
 rild.libpath=/system/lib/libsec-ril.so
 rild.libargs=-d /dev/ttyS0
 ro.sf.lcd_density=240
-ro.HOME_APP_ADJ=1
 persist.sys.usb.config=mtp,adb
 
 # CWM key repeat
@@ -19,4 +18,4 @@ sys.mem.max_hidden_apps=5
 com.ti.omap_enhancement=true
 
 # Disable zram
-ro.zram.default=0 
+ro.zram.default=0
