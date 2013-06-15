@@ -208,8 +208,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
        wifi.supplicant_scan_interval=180 \
        ro.telephony.ril_class=SamsungExynos3RIL \
        ro.telephony.ril.v3=icccardstatus,datacall,signalstrength,facilitylock \
-       mobiledata.interfaces=pdp0,eth0,gprs,ppp0 \
-       dev.sfbootcomplete=0
+       ro.telephony.call_ring.multiple=false \
+       ro.telephony.call_ring.delay=2000 \
+       dev.sfbootcomplete=0 \
+       mobiledata.interfaces=pdp0,eth0,gprs,ppp0
 
 
 # enable Google-specific location features,
