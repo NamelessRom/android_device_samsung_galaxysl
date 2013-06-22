@@ -61,18 +61,6 @@ on post-fs
     symlink /radio/modem.bin /dev/block/bml13
 
 on post-fs-data
-# permission for dvfslock ctrl
-	chown radio system /sys/power/dvfslock_ctrl
-	chmod 0660 /sys/power/dvfslock_ctrl
-
-# permission for battery
-    chown radio system /sys/class/power_supply/battery/batt_fuelgauge_reset
-    chmod 0664 /sys/class/power_supply/battery/batt_fuelgauge_reset
-
-# change permission of ftm_sleep
-	chown system system /sys/power/ftm_sleep
-	chmod 0664 /sys/power/ftm_sleep
-
 # change permission of pm_debug
     chmod 0664 /sys/kernel/debug/pm_debug/voltage/vdd_mpu/vp_errorgain
     chmod 0664 /sys/kernel/debug/pm_debug/voltage/vdd_mpu/vp_smpswaittimemin
@@ -372,12 +360,6 @@ on post-fs-data
     chown system system /sys/touchscreen/set_qt_firm_update
 
 on boot
-# fake some battery state
-    setprop status.battery.state Slow
-    setprop status.battery.level 5
-    setprop status.battery.level_raw  50
-    setprop status.battery.level_scale 9
-
     # Enabling sleep in idle path
     write /debug/pm_debug/sleep_while_idle 1
 
