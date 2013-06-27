@@ -188,6 +188,10 @@ CameraHardware::CameraHardware(int CameraID)
     property_get("camera.record.drop", value, "15");
     framesToDrop = atoi(value);
     ALOGI("Initial frames to drop: %d", framesToDrop);
+
+    // Disable ISP resizer (use DSS resizer)
+    system("echo 0 > "
+            "/sys/devices/platform/dsscomp/isprsz/enable");
 }
 
 void CameraHardware::initDefaultParameters(int CameraID)
@@ -404,6 +408,10 @@ CameraHardware::~CameraHardware()
     }
     delete mCamera;
     mCamera = 0;
+
+    // Re-enable ISP resizer for 720P playback
+    system("echo 1 > "
+            "/sys/devices/platform/dsscomp/isprsz/enable");
 }
 
 sp<IMemoryHeap> CameraHardware::getPreviewHeap() const
