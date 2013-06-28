@@ -152,6 +152,9 @@ PRODUCT_PACKAGES += hwcomposer.latona
 #Camera
 PRODUCT_PACKAGES += camera.latona
 
+#Power
+PRODUCT_PACKAGES += power.latona
+
 # OMX stuff
 PRODUCT_PACKAGES += \
     libstagefrighthw \
