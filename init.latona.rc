@@ -122,6 +122,9 @@ on post-fs-data
 # ION - MEMORY ALLOCATOR
     chmod 0777 /dev/ion
 
+#Permissions for setting the DSP Frequency
+    chown media root /sys/power/dsp_freq
+
 # change permissions for overlay managers and display devices
     chmod 0777 /sys/devices/platform/omapdss/manager0/name
     chmod 0777 /sys/devices/platform/omapdss/manager1/name

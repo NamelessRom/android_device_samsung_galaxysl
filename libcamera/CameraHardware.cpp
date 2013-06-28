@@ -56,6 +56,9 @@
 #define MAX_STR_LEN 35
 #define EXIF_FILE_SIZE 28800
 
+#define DSP3630_KHZ_MIN 260000
+#define DSP3630_KHZ_MAX 800000
+
 #define BACK_CAMERA_AUTO_FOCUS_DISTANCES_STR "0.10,1.20,Infinity"
 #define BACK_CAMERA_MACRO_FOCUS_DISTANCES_STR "0.10,0.20,Infinity"
 #define BACK_CAMERA_INFINITY_FOCUS_DISTANCES_STR "0.10,1.20,Infinity"
@@ -192,6 +195,13 @@ CameraHardware::CameraHardware(int CameraID)
     // Disable ISP resizer (use DSS resizer)
     system("echo 0 > "
             "/sys/devices/platform/dsscomp/isprsz/enable");
+}
+
+void CameraHardware::SetDSPKHz(unsigned int KHz)
+{
+    char command[100];
+    sprintf(command, "echo %u > /sys/power/dsp_freq", KHz);
+    system(command);
 }
 
 void CameraHardware::initDefaultParameters(int CameraID)
@@ -863,6 +873,9 @@ status_t CameraHardware::startRecording()
     ALOGE("startRecording");
     Mutex::Autolock lock(mRecordingLock);
 
+    // Boost DSP OPP to highest level
+    SetDSPKHz(DSP3630_KHZ_MAX);
+
     //Skip the first recording frames since it is often garbled
     setSkipFrame(framesToDrop);
 
@@ -887,6 +900,9 @@ void CameraHardware::stopRecording()
         }*/
         mRecordingEnabled = false;
     }
+
+    // Release constraint to DSP OPP by setting lowest Hz
+    SetDSPKHz(DSP3630_KHZ_MIN);
 }
 
 bool CameraHardware::recordingEnabled()
