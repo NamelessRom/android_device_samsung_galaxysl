@@ -374,16 +374,6 @@ on post-fs-data
     chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/state
     chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/type
    
-# Touchscreen fix (waleedq)
-    write /sys/touchscreen/settings/set_touchscreen 7032
-    write /sys/touchscreen/settings/set_noise 4027
-    write /sys/touchscreen/settings/set_acquisition 4000
-    exec /system/bin/cat /sys/touchscreen/settings/set_write
- 	
-# permission for touchscreen
-    chown system system /sys/touchscreen/bootcomplete
-    chown system system /sys/touchscreen/set_qt_firm_update
-
 on boot
     # Enabling sleep in idle path
     write /debug/pm_debug/sleep_while_idle 1
