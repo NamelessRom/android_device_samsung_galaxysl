@@ -27,7 +27,5 @@ public class Startup extends BroadcastReceiver {
         Hspa.restore(context);
         TouchkeysTimeout.restore(context);
         VibratorIntensity.restore(context);
-        TouchscreenSensitivity.restore(context);
-        TouchkeysSensitivity.restore(context);
     }
 }

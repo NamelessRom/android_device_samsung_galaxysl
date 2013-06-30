@@ -37,8 +37,6 @@ public class DeviceSettings extends FragmentActivity {
     public static final String ACTION_UPDATE_PREFERENCES = "com.cyanogenmod.settings.device.UPDATE";
     public static final String KEY_HSPA = "hspa";
     public static final String KEY_ACCELEROMETER_CALIBRATION = "accelerometer_calibration";
-    public static final String KEY_TOUCHSCREEN_SENSITIVITY = "touchscreen_sensitivity";
-    public static final String KEY_TOUCHKEYS_SENSITIVITY = "touchkeys_sensitivity";
     public static final String KEY_TOUCHKEYS_TIMEOUT_DISABLED = "touchkeys_timeout_disabled";
     public static final String KEY_TOUCHKEYS_TIMEOUT = "touchkeys_timeout";
     public static final String KEY_VIBRATOR_INTENSITY = "vibrator_intensity";

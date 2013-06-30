@@ -10,20 +10,9 @@
     <string name="seekbar_btn_default_title">Default</string>
     <string name="plus">+</string>
     <string name="minus">-</string>
-    <string name="seekbar_additional_information">Lower values increase sensitivity</string>
-
-    <!-- Touchscreen -->
-    <string name="touchscreen_subcat_title">Touchscreen</string>
-    <string name="touchscreen_sensitivity_title_head">Touch sensitivity</string>
-    <string name="touchscreen_sensitivity_summary_head">Set touch panel sensitivity</string>
-    <string name="touchscreen_sensitivity_seekbar_title">Sensitivity</string>
 
     <!-- Touchkeys -->
     <string name="touchkeys_subcat_title">Touchkeys</string>
-    <string name="touchkeys_sensitivity_title_head">Touchkeys sensitivity</string>
-    <string name="touchkeys_sensitivity_summary_head">Set touchkeys sensitivity</string>
-    <string name="touchkeys_sensitivity_seekbar_title">Touchkey sensitivity</string>
-
     <string name="touchkeys_timeout_disabled_title_head">Disable backlight</string>
     <string name="touchkeys_timeout_disabled_summary_head">Go to the display settings to disable LED notifications</string>
 

@@ -27,8 +27,6 @@ import android.preference.PreferenceScreen;
 
 public class ScreenFragmentActivity extends PreferenceFragment {
 
-    private TouchscreenSensitivity mTouchscreenSensitivity;
-    private TouchkeysSensitivity mTouchkeysSensitivity;
     private TouchkeysTimeout mTouchkeysTimeout;
     private CheckBoxPreference mTouchkeysTimeoutDisabled;
 
@@ -38,13 +36,7 @@ public class ScreenFragmentActivity extends PreferenceFragment {
 
         addPreferencesFromResource(R.xml.screen_preferences);
 
-        mTouchscreenSensitivity = (TouchscreenSensitivity) findPreference(DeviceSettings.KEY_TOUCHSCREEN_SENSITIVITY);
-        mTouchscreenSensitivity.setEnabled(TouchscreenSensitivity.isSupported());
-
-        mTouchkeysSensitivity = (TouchkeysSensitivity) findPreference(DeviceSettings.KEY_TOUCHKEYS_SENSITIVITY);
-        mTouchkeysSensitivity.setEnabled(TouchkeysSensitivity.isSupported());
-
-        mTouchkeysTimeout = (TouchkeysTimeout) findPreference(DeviceSettings.KEY_TOUCHKEYS_TIMEOUT);
+         mTouchkeysTimeout = (TouchkeysTimeout) findPreference(DeviceSettings.KEY_TOUCHKEYS_TIMEOUT);
         mTouchkeysTimeoutDisabled = (CheckBoxPreference) findPreference(DeviceSettings.KEY_TOUCHKEYS_TIMEOUT_DISABLED);
 
         mTouchkeysTimeoutDisabled.setEnabled(TouchkeysTimeout.isSupported());
