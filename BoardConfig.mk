@@ -73,6 +73,7 @@ BOARD_WPAN_DEVICE := true
 BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := device/samsung/galaxysl/bluetooth
 
 # Egl
+TARGET_DISABLE_TRIPLE_BUFFERING := true
 BOARD_EGL_CFG := device/samsung/galaxysl/egl.cfg
 USE_OPENGL_RENDERER := true
 
