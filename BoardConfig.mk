@@ -78,6 +78,9 @@ BOARD_EGL_CFG := device/samsung/galaxysl/egl.cfg
 USE_OPENGL_RENDERER := true
 COMMON_GLOBAL_CFLAGS += -DHAS_CONTEXT_PRIORITY
 
+# Enable suspend in charger
+BOARD_CHARGER_ENABLE_SUSPEND := true
+
 # Enable WEBGL in WebKit
 ENABLE_WEBGL := true
 
