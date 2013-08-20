@@ -25,46 +25,22 @@
 #include <hardware/hardware.h>
 #include <hardware/power.h>
 
-#define CPUFREQ_INTERACTIVE "/sys/devices/system/cpu/cpufreq/interactive/"
 #define CPUFREQ_CPU0 "/sys/devices/system/cpu/cpu0/cpufreq/"
-#define BOOSTPULSE_PATH (CPUFREQ_INTERACTIVE "boostpulse")
+#define CPUFREQ_ONDEMAND "/sys/devices/system/cpu/cpufreq/ondemand/"
+#define BOOSTPULSE_ONDEMAND (CPUFREQ_ONDEMAND "boostpulse")
 
 #define MAX_BUF_SZ  10
 
-#define MAX_FREQ_NUMBER 10
-#define NOM_FREQ_INDEX 2
-
-static char *freq_list[MAX_FREQ_NUMBER];
-static char *max_freq, *nom_freq;
+/* initialize to something safe */
+static char screen_off_max_freq[MAX_BUF_SZ] = "800000";
+static char scaling_max_freq[MAX_BUF_SZ] = "1000000";
 
 struct latona_power_module {
     struct power_module base;
     pthread_mutex_t lock;
     int boostpulse_fd;
     int boostpulse_warned;
-    short inited;
 };
-
-static int str_to_tokens(char *str, char **token, int max_token_idx)
-{
-    char *pos, *start_pos = str;
-    char *token_pos;
-    int token_idx = 0;
-
-    if (!str || !token || !max_token_idx) {
-        return 0;
-    }
-
-    do {
-        token_pos = strtok_r(start_pos, " \t\r\n", &pos);
-
-        if (token_pos)
-            token[token_idx++] = strdup(token_pos);
-        start_pos = NULL;
-    } while (token_pos && token_idx < max_token_idx);
-
-    return token_idx;
-}
 
 static void sysfs_write(char *path, char *s)
 {
@@ -87,6 +63,7 @@ static void sysfs_write(char *path, char *s)
     close(fd);
 }
 
+
 int sysfs_read(const char *path, char *buf, size_t size)
 {
     int fd, len;
@@ -106,46 +83,7 @@ int sysfs_read(const char *path, char *buf, size_t size)
 
 static void latona_power_init(struct power_module *module)
 {
-    int tmp;
-    struct latona_power_module *powmod =
-                                   (struct latona_power_module *) module;
-    char freq_buf[MAX_FREQ_NUMBER*10];
-    int freq_num;
-
-    tmp = sysfs_read(CPUFREQ_CPU0 "scaling_available_frequencies",
-                                                   freq_buf, sizeof(freq_buf));
-    if (tmp <= 0) {
-        return;
-    }
-
-    freq_num = str_to_tokens(freq_buf, freq_list, MAX_FREQ_NUMBER);
-
-    /* Discard trailing empties */
-    while (!atoi(freq_list[freq_num - 1]) && freq_num) {
-        freq_num--;
-    }
-
-    if (!freq_num) {
-        return;
-    }
-
-    max_freq = freq_list[freq_num - 1];
-    tmp = (NOM_FREQ_INDEX > freq_num) ? freq_num : NOM_FREQ_INDEX;
-    nom_freq = freq_list[tmp - 1];
-
-    /*
-     * cpufreq interactive governor: timer 20ms, min sample 50ms,
-     * hispeed nominal (3rd freq) at load 50%.
-     */
-
-    sysfs_write(CPUFREQ_INTERACTIVE "timer_rate", "20000");
-    sysfs_write(CPUFREQ_INTERACTIVE "min_sample_time", "50000");
-    sysfs_write(CPUFREQ_INTERACTIVE "hispeed_freq", nom_freq);
-    sysfs_write(CPUFREQ_INTERACTIVE "go_hispeed_load", "50");
-    sysfs_write(CPUFREQ_INTERACTIVE "above_hispeed_delay", "100000");
-    sysfs_write(CPUFREQ_INTERACTIVE "input_boost", "1");
-
-    powmod->inited = 1;
+    sysfs_write(CPUFREQ_ONDEMAND "boostfreq", "800000");
 }
 
 static int boostpulse_open(struct latona_power_module *latona)
@@ -155,15 +93,14 @@ static int boostpulse_open(struct latona_power_module *latona)
     pthread_mutex_lock(&latona->lock);
 
     if (latona->boostpulse_fd < 0) {
-        latona->boostpulse_fd = open(BOOSTPULSE_PATH, O_WRONLY);
+        latona->boostpulse_fd = open(BOOSTPULSE_ONDEMAND, O_WRONLY);
 
-        if (latona->boostpulse_fd < 0) {
-            if (!latona->boostpulse_warned) {
-                strerror_r(errno, buf, sizeof(buf));
-                ALOGE("Error opening %s: %s\n", BOOSTPULSE_PATH, buf);
-                latona->boostpulse_warned = 1;
-            }
-        }
+        if (latona->boostpulse_fd < 0 && !latona->boostpulse_warned) {
+            strerror_r(errno, buf, sizeof(buf));
+            ALOGE("Error opening boostpulse: %s\n", buf);
+            latona->boostpulse_warned = 1;
+        } else if (latona->boostpulse_fd > 0)
+            ALOGD("Opened boostpulse interface\n");
     }
 
     pthread_mutex_unlock(&latona->lock);
@@ -172,21 +109,31 @@ static int boostpulse_open(struct latona_power_module *latona)
 
 static void latona_power_set_interactive(struct power_module *module, int on)
 {
-    int len;
-    char buf[MAX_BUF_SZ];
-    struct latona_power_module *powmod =
-                                   (struct latona_power_module *) module;
+    return;
 
-    if (!powmod->inited) {
-        return;
-    }
+    int len;
+
+    char buf[MAX_BUF_SZ];
 
     /*
      * Lower maximum frequency when screen is off.  
      */
-    sysfs_write(CPUFREQ_CPU0 "scaling_max_freq", on ? max_freq : nom_freq);
+    if (!on) {
+        /* read the current scaling max freq and save it before updating */
+        len = sysfs_read(CPUFREQ_CPU0 "scaling_max_freq", buf, sizeof(buf));
 
-    sysfs_write(CPUFREQ_INTERACTIVE "input_boost", on ? "1" : "0");
+        /* make sure it's not the screen off freq, if the "on"
+         * call is skipped (can happen if you press the power
+         * button repeatedly) we might have read it. We should
+         * skip it if that's the case
+         */
+        if (len != -1 && strncmp(buf, screen_off_max_freq,
+                strlen(screen_off_max_freq)) != 0)
+            memcpy(scaling_max_freq, buf, sizeof(buf));
+        sysfs_write(CPUFREQ_CPU0 "scaling_max_freq", screen_off_max_freq);
+    } else
+        sysfs_write(CPUFREQ_CPU0 "scaling_max_freq", scaling_max_freq);
+
 }
 
 static void latona_power_hint(struct power_module *module, power_hint_t hint,
@@ -195,23 +142,28 @@ static void latona_power_hint(struct power_module *module, power_hint_t hint,
     struct latona_power_module *latona = (struct latona_power_module *) module;
     char buf[80];
     int len;
-    struct latona_power_module *powmod =
-                                   (struct latona_power_module *) module;
-
-    if (!powmod->inited) {
-        return;
-    }
+    int duration = 1;
 
     switch (hint) {
     case POWER_HINT_INTERACTION:
+    case POWER_HINT_CPU_BOOST:
         if (boostpulse_open(latona) >= 0) {
-	    len = write(latona->boostpulse_fd, "1", 1);
+            if (data != NULL)
+                duration = (int) data;
 
-	    if (len < 0) {
-	        strerror_r(errno, buf, sizeof(buf));
-		ALOGE("Error writing to %s: %s\n", BOOSTPULSE_PATH, buf);
-	    }
-	}
+            snprintf(buf, sizeof(buf), "%d", duration);
+            len = write(latona->boostpulse_fd, "1", 1);
+
+            if (len < 0) {
+                strerror_r(errno, buf, sizeof(buf));
+                ALOGE("Error writing to boostpulse: %s\n", buf);
+                pthread_mutex_lock(&latona->lock);
+                close(latona->boostpulse_fd);
+                latona->boostpulse_fd = -1;
+                latona->boostpulse_warned = 0;
+                pthread_mutex_unlock(&latona->lock);
+            }
+        }
         break;
 
     case POWER_HINT_VSYNC:
