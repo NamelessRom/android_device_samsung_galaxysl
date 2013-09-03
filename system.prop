@@ -16,3 +16,6 @@ com.ti.omap_enhancement=true
 
 # Disable zram
 ro.zram.default=0
+
+# Scissor Optimization
+ro.hwui.disable_scissor_opt=true
