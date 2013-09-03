@@ -1,5 +1,5 @@
 #
-# system.prop for smdkc110
+# system.prop for latona
 #
 
 rild.libpath=/system/lib/libsec-ril.so
@@ -10,9 +10,6 @@ persist.sys.usb.config=mtp,adb
 # CWM key repeat
 ro.cwm.enable_key_repeat=true
 ro.cwm.repeatable_keys=115,114,158
-
-## Limit activities
-sys.mem.max_hidden_apps=5
 
 ## Enable OMAP stuffs
 com.ti.omap_enhancement=true

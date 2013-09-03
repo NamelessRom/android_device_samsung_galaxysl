@@ -238,7 +238,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Vold
 PRODUCT_PROPERTY_OVERRIDES += \
-	ro.vold.switchablepair=/storage/sdcard0,/storage/sdcard1
+	ro.additionalmounts=/storage/sdcard1
 
 include frameworks/native/build/phone-hdpi-512-dalvik-heap.mk
 

@@ -39,6 +39,7 @@ elif ! busybox test -e /system/build.prop ; then
 	RAMDISK=ramdisk-recovery.cpio.gz
 
 	busybox umount /sdcard
+	busybox umount /cache
 fi
 
 busybox umount /system
