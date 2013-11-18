@@ -14,8 +14,8 @@
  */
 
 int main() {
-    char tmpbdaddr[23]; // bt_macaddr:xxxxxxxxxxxx
-    char bdaddr[18];
+    char tmpbdaddr[PROP_VALUE_MAX]; // bt_macaddr:xxxxxxxxxxxx
+    char bdaddr[PROP_VALUE_MAX];
     int fd;
 
     property_get(SAMSUNG_BDADDR_PATH, tmpbdaddr, "");

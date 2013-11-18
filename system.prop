@@ -20,3 +20,6 @@ ro.hwui.disable_scissor_opt=true
 
 # GPU Producer to CPU Consumer
 ro.bq.gpu_to_cpu_unsupported=1
+
+#Low RAM device
+ro.config.low_ram=true
