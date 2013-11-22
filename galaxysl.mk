@@ -199,6 +199,13 @@ PRODUCT_PACKAGES += \
 # address
 PRODUCT_PACKAGES += store-mac-addr.sh
 
+# WIFI Firmwares
+PRODUCT_PACKAGES += \
+    wl127x-fw-4-sr.bin \
+    wl127x-fw-4-mr.bin \
+    wl127x-fw-4-plt.bin \
+    wl1271-nvs_127x.bin
+
 # device specific overlays
 DEVICE_PACKAGE_OVERLAYS += device/samsung/galaxysl/overlay
 
