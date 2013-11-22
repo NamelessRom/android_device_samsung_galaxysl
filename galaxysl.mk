@@ -230,6 +230,17 @@ PRODUCT_PROPERTY_OVERRIDES += \
        ro.telephony.call_ring.delay=2000 \
        mobiledata.interfaces=pdp0,eth0,gprs,ppp0
 
+# SGX530 is slower with the scissor optimization enabled
+PRODUCT_PROPERTY_OVERRIDES += \
+       ro.hwui.disable_scissor_opt=true
+
+# GPU Producer to CPU Consumer
+PRODUCT_PROPERTY_OVERRIDES += \
+       ro.bq.gpu_to_cpu_unsupported=1
+
+# Low RAM Device
+PRODUCT_PROPERTY_OVERRIDES += \
+       ro.config.low_ram=true
 
 # enable Google-specific location features,
 # like NetworkLocationProvider and LocationCollector
