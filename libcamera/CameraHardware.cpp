@@ -346,7 +346,6 @@ void CameraHardware::initDefaultParameters(int CameraID)
     p.set("iso", "auto");
 
     //Extra Parameters - GalaxySL
-    mCamera->setISO(ISO_AUTO);
     mCamera->setMetering(METERING_CENTER);
     mCamera->setContrast(CONTRAST_DEFAULT);
     mCamera->setSharpness(SHARPNESS_DEFAULT);
