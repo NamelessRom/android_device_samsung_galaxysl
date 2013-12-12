@@ -6,6 +6,7 @@ LOCAL_SRC_FILES:= \
     CameraHal_Module.cpp \
     V4L2Camera.cpp \
     CameraHardware.cpp \
+    CameraUtils.cpp \
     converter.cpp \
     ExifCreator.cpp \
     JpegEncoder.c \

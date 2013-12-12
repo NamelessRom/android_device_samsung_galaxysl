@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include "CameraHardware.h"
+#include "CameraUtils.h"
 #include "converter.h"
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -1356,6 +1357,33 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
                 mParameters.set(CameraParameters::KEY_SCENE_MODE, new_scene_mode_str);
             }
         }
+
+        // touch to focus
+        const char *new_focus_area = params.get(CameraParameters::KEY_FOCUS_AREAS);
+        if (new_focus_area != NULL) {
+            ALOGV("focus area: %s", new_focus_area);
+            CameraArea area(new_focus_area);
+
+            if (!area.isDummy()) {
+                mParameters.getPreviewSize(&width, &height);
+
+                int x = area.getX(width);
+                int y = area.getY(height);
+
+                ALOGV("area=%s, x=%i, y=%i", area.toString8().string(), x, y);
+                if (mCamera->setObjectPosition(x, y) < 0) {
+                    ALOGE("ERR(%s):Fail on mCamera->setObjectPosition(%s)", __func__, new_focus_area);
+                    ret = UNKNOWN_ERROR;
+                }
+            }
+
+            int val = area.isDummy() ? 0 : 1;
+            if (mCamera->setTouchAFStartStop(val) < 0) {
+                ALOGE("ERR(%s):Fail on mCamera->setTouchAFStartStop(%d)", __func__, val);
+                ret = UNKNOWN_ERROR;
+            }
+        }
+
         //Camera Zoom Control
         int new_zoom = params.getInt(CameraParameters::KEY_ZOOM);
         int max_zoom = params.getInt(CameraParameters::KEY_MAX_ZOOM);

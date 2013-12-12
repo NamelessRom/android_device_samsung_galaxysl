@@ -102,6 +102,8 @@ public:
     int setAutofocus();
     int getAutoFocusResult();
     int cancelAutofocus();
+    int setObjectPosition(int x, int y);
+    int setTouchAFStartStop(int start_stop);
     int setZoom(int zoom_level);
     int setWhiteBalance(int white_balance);
     int setFramerate(int framerate,int cam_mode);

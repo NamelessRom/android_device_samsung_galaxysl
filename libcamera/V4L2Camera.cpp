@@ -931,6 +931,43 @@ int V4L2Camera::cancelAutofocus(void)
 }
 
 // End of Autofocus
+
+// Touch Focus
+
+int V4L2Camera::setObjectPosition(int x, int y)
+{
+    ALOGV("%s(setObjectPosition(x=%d, y=%d))", __func__, x, y);
+
+    if (videoIn->isStreaming) {
+        if (v4l2_s_ctrl(camHandle, V4L2_CID_CAMERA_OBJECT_POSITION_X, x) < 0) {
+            ALOGE("ERR(%s):Fail on V4L2_CID_CAMERA_OBJECT_POSITION_X", __func__);
+            return -1;
+        }
+
+        if (v4l2_s_ctrl(camHandle, V4L2_CID_CAMERA_OBJECT_POSITION_Y, y) < 0) {
+            ALOGE("ERR(%s):Fail on V4L2_CID_CAMERA_OBJECT_POSITION_Y", __func__);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+int V4L2Camera::setTouchAFStartStop(int start_stop)
+{
+    ALOGV("%s(touch_af_start_stop (%d))", __func__, start_stop);
+
+    if (videoIn->isStreaming) {
+        // We need to send this command regardless of previous state to trigger AF
+        if (v4l2_s_ctrl(camHandle, V4L2_CID_CAMERA_TOUCH_AF_START_STOP, start_stop) < 0) {
+            ALOGE("ERR(%s):Fail on V4L2_CID_CAMERA_TOUCH_AF_START_STOP", __func__);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 // Zoom Setting
 int V4L2Camera::setZoom(int zoom_level)
 {
