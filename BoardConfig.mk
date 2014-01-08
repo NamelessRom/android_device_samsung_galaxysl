@@ -42,6 +42,7 @@ BOARD_PAGE_SIZE := 4096
 TARGET_SPECIFIC_HEADER_PATH := device/samsung/galaxysl/include
 
 BOARD_CUSTOM_BOOTIMG_MK := device/samsung/galaxysl/shbootimg.mk
+TARGET_SYSTEMIMAGE_USE_SQUISHER := true
 
 # Inline kernel building config
 TARGET_KERNEL_CONFIG := latona_defconfig
