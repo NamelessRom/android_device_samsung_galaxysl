@@ -242,10 +242,6 @@ PRODUCT_PROPERTY_OVERRIDES += \
 PRODUCT_PROPERTY_OVERRIDES += \
        ro.config.low_ram=true
 
-# zRAM
-PRODUCT_PROPERTY_OVERRIDES += \
-       ro.zram.default=18
-
 # enable Google-specific location features,
 # like NetworkLocationProvider and LocationCollector
 PRODUCT_PROPERTY_OVERRIDES += \

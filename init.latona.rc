@@ -28,6 +28,7 @@ on fs
     mount yaffs2 mtd@system /system
 
     mount_all fstab.latona
+    swapon_all fstab.latona
 
     # download cache
     mkdir /data/download 0770 system cache
