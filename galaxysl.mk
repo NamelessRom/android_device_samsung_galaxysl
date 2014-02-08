@@ -242,6 +242,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
 PRODUCT_PROPERTY_OVERRIDES += \
        ro.config.low_ram=true
 
+# KSM
+PRODUCT_PROPERTY_OVERRIDES += \
+       ro.ksm.default=1
+
 # enable Google-specific location features,
 # like NetworkLocationProvider and LocationCollector
 PRODUCT_PROPERTY_OVERRIDES += \
