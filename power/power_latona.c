@@ -202,7 +202,7 @@ static void latona_power_init(struct power_module *module)
 {
     get_scaling_governor();
     configure_governor();
-    sysfs_write(CPUFREQ_CPU0 "screen_off_max_freq", "800000");
+    sysfs_write(CPUFREQ_CPU0 "screen_off_max_freq", "600000");
 }
 
 static struct hw_module_methods_t power_module_methods = {
