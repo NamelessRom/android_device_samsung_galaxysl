@@ -50,7 +50,6 @@ TARGET_KERNEL_SOURCE := kernel/samsung/latona
 
 # recovery
 BOARD_HAS_NO_SELECT_BUTTON := true
-BOARD_CUSTOM_RECOVERY_KEYMAPPING := ../../device/samsung/galaxysl/recovery/recovery_keys.c
 BOARD_USES_BML_OVER_MTD := true
 TARGET_RECOVERY_FSTAB := device/samsung/galaxysl/fstab.latona
 RECOVERY_FSTAB_VERSION := 2
