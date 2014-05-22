@@ -82,6 +82,10 @@ COMMON_GLOBAL_CFLAGS += -DHAS_CONTEXT_PRIORITY -DDONT_USE_FENCE_SYNC
 BOARD_EGL_WORKAROUND_BUG_10194508 := true
 TARGET_RUNNING_WITHOUT_SYNC_FRAMEWORK := true
 
+# OMAP3 HWC: disable use of YUV overlays
+# Prevents stuttering/compositing artifacts and sync loss during video playback
+TARGET_OMAP3_HWC_DISABLE_YUV_OVERLAY := true
+
 # Enable suspend in charger
 BOARD_CHARGER_ENABLE_SUSPEND := true
 BOARD_CHARGER_DISABLE_INIT_BLANK := true
