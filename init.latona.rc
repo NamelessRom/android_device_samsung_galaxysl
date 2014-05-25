@@ -42,9 +42,6 @@ on fs
     chown radio radio /radio/modem.bin
     chmod 0664 /radio/modem.bin
 
-    export TMPDIR /data/local/tmp
-    symlink /data/local/tmp /tmp
-
 on post-fs
 
     # symlink for SamsungRIL
