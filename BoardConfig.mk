@@ -15,12 +15,6 @@ TARGET_ARCH_LOWMEM := true
 
 TARGET_GLOBAL_CFLAGS += -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp
 TARGET_GLOBAL_CPPFLAGS += -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp
-TARGET_arm_CFLAGS := -Os -fomit-frame-pointer -fstrict-aliasing -funswitch-loops \
-                       -fmodulo-sched -fmodulo-sched-allow-regmoves
-TARGET_thumb_CFLAGS := -mthumb \
-                        -Os \
-                        -fomit-frame-pointer \
-                        -fstrict-aliasing
 
 COMMON_GLOBAL_CFLAGS += -DOMAP_ENHANCEMENT -DTARGET_OMAP3
 
