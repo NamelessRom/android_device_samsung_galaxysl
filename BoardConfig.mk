@@ -41,6 +41,8 @@ TARGET_SYSTEMIMAGE_USE_SQUISHER := true
 # Inline kernel building config
 TARGET_KERNEL_CONFIG := latona_defconfig
 TARGET_KERNEL_SOURCE := kernel/samsung/latona
+TARGET_GCC_VERSION_EXP := 4.8
+TARGET_KERNEL_CUSTOM_TOOLCHAIN := arm-cortex_a8-linux-gnueabi-linaro_4.7.4
 
 # recovery
 BOARD_HAS_NO_SELECT_BUTTON := true
