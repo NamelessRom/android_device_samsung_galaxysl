@@ -275,6 +275,9 @@ on boot
 # zRAM: only read one page at a time
     write /proc/sys/vm/page-cluster 0
 
+    # reduce swappiness for foreground processes
+    write /proc/sys/vm/swappiness 20
+
 # for datarouter
     chown system system /dev/ttyGS0
     chown system system /dev/dun
