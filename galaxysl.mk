@@ -195,6 +195,11 @@ PRODUCT_PACKAGES += \
     libOMX.TI.AMR.decode \
     libOMX.TI.G726.decode
 
+#ITTIAM OMX
+PRODUCT_PACKAGES += \
+    libOMX.TI.720P.Decoder \
+    libOMX.TI.720P.Encoder
+
 # Script to edit the shipped nvs file to insert the device's assigned MAC
 # address
 PRODUCT_PACKAGES += store-mac-addr.sh
