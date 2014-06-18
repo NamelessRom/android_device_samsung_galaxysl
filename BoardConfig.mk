@@ -87,6 +87,9 @@ BOARD_CHARGER_DISABLE_INIT_BLANK := true
 # Enable WEBGL in WebKit
 ENABLE_WEBGL := true
 
+#ION
+BOARD_HAVE_OLD_ION_API := true
+
 # OMX
 HARDWARE_OMX := true
 ifdef HARDWARE_OMX
