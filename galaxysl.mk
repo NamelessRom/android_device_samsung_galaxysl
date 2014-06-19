@@ -166,7 +166,7 @@ PRODUCT_PACKAGES += \
     libPERF \
     libOMX_Core \
     libLCML \
-    libion \
+    libion_ti \
     libtiutils \
     libomap_mm_library_jni \
     libOMX.TI.Video.Decoder \
