@@ -545,34 +545,7 @@ int V4L2Camera::StopStreaming(int cam_state)
     return 0;
 }
 
-void * V4L2Camera::GrabPreviewFrame(int &index)
-{
-    int ret;
-
-    videoIn->buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    videoIn->buf.memory = V4L2_MEMORY_MMAP;
-
-    /* DQ */
-    ret = ioctl(camHandle, VIDIOC_DQBUF, &videoIn->buf);
-    if (ret < 0) {
-        ALOGE("GrabPreviewFrame: VIDIOC_DQBUF Failed");
-        return NULL;
-    }
-    nDequeued++;
-
-    index = videoIn->buf.index;
-
-    ret = ioctl(camHandle, VIDIOC_QBUF, &videoIn->buf);
-    nQueued++;
-    if (ret < 0) {
-        ALOGE("GrabPreviewFrame: VIDIOC_QBUF Failed");
-        return NULL;
-    }
-
-    return(videoIn->mem[videoIn->buf.index]);
-}
-
-void* V4L2Camera::GrabRecordFrame(int& index)
+void* V4L2Camera::GrabFrame(int& index)
 {
     int ret;
 
@@ -592,7 +565,7 @@ void* V4L2Camera::GrabRecordFrame(int& index)
     return(videoIn->mem[videoIn->buf.index] );
 }
 
-void V4L2Camera::ReleaseRecordFrame(int index)
+void V4L2Camera::ReleaseFrame(int index)
 {
     int ret;
 

@@ -108,6 +108,10 @@ CameraHardware::CameraHardware(int CameraID)
     mScaleHeap = NULL;
     mFrameScaled = NULL;
 
+    // Disable ISP resizer (use DSS resizer)
+    system("echo 0 > "
+            "/sys/devices/platform/dsscomp/isprsz/enable");
+
     if (CameraID == CAMERA_FF) {
         mCamera->Open(VIDEO_DEVICE_2);
         if (scale_init(PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_WIDTH, PREVIEW_HEIGHT, PIX_YUV422I, PIX_YUV422I) < 0)
@@ -122,7 +126,7 @@ CameraHardware::CameraHardware(int CameraID)
     mNativeWindow = NULL;
     for (int i = 0; i < NB_BUFFER; i++) {
         mRecordHeap[i] = NULL;
-        //mRecordBufferState[i] = 0;
+        mRecordBufferState[i] = 0;
     }
 
     if (!mGrallocHal) {
@@ -412,6 +416,10 @@ CameraHardware::~CameraHardware()
     }
     delete mCamera;
     mCamera = 0;
+
+    // Re-enable ISP resizer on overlay for 720P playback
+    system("echo 1 > "
+            "/sys/devices/platform/dsscomp/isprsz/enable");  
 }
 
 void CameraHardware::setCallbacks(camera_notify_callback notify_cb,
@@ -603,14 +611,16 @@ int CameraHardware::previewThread()
         showFPS("Preview");
     }
 
-    tempbuf = mCamera->GrabPreviewFrame(index);
-
-    offset = preview_framesize * index;
-
-    if (mRecordingEnabled && buffersQueued > 6) {
-        ALOGE("Buffers queued: %d", buffersQueued);
+    mRecordingLock.lock();
+    if (buffersQueued > 5) {
+        mRecordingLock.unlock();
         return NO_ERROR;
     }
+    mRecordingLock.unlock();
+
+    tempbuf = mCamera->GrabFrame(index);
+
+    offset = preview_framesize * index;
 
     timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
@@ -679,19 +689,22 @@ callbacks:
         mDataCb(CAMERA_MSG_PREVIEW_FRAME, mPreviewHeap, index, NULL, mCallbackCookie);
     }
 
-    Mutex::Autolock lock(mRecordingLock);
     if (mRecordingEnabled == true) {
         if (mCameraID == CAMERA_FF)
             memcpy(mRecordHeap[index]->data, mFrameScaled->data, framesize);
         else
             memcpy(mRecordHeap[index]->data, tempbuf, framesize);
+        mRecordingLock.lock();
         buffersQueued++;
-        //mRecordBufferState[index] = 1;
+        mRecordBufferState[index] = 1;
+        mRecordingLock.unlock();
 
         // Notify the client of a new frame.
         if (mMsgEnabled & CAMERA_MSG_VIDEO_FRAME) {
             mDataCbTimestamp(timestamp, CAMERA_MSG_VIDEO_FRAME, mRecordHeap[index], 0, mCallbackCookie);
         }
+    } else {
+        mCamera->ReleaseFrame(index);
     }
 
     return NO_ERROR;
@@ -755,7 +768,7 @@ status_t CameraHardware::startPreviewInternal()
             mRecordHeap[i]->release(mRecordHeap[i]);
             mRecordHeap[i] = 0;
         }
-        //mRecordBufferState[i] = 0;
+        mRecordBufferState[i] = 0;
         mRecordHeap[i] = mRequestMemory(-1, framesize, 1, NULL);
     }
 
@@ -833,16 +846,15 @@ bool CameraHardware::previewEnabled()
 status_t CameraHardware::startRecording()
 {
     ALOGE("startRecording");
-    Mutex::Autolock lock(mRecordingLock);
 
     // Boost DSP OPP to highest level
     SetDSPKHz(DSP3630_KHZ_MAX);
 
-    mCamera->setCamMode(MODE_CAMCORDER);
-
+    mRecordingLock.lock();
     buffersQueued = 0;
 
     mRecordingEnabled = true;
+    mRecordingLock.unlock();
     return NO_ERROR;
 
 }
@@ -850,18 +862,17 @@ status_t CameraHardware::startRecording()
 void CameraHardware::stopRecording()
 {
     ALOGE("stopRecording");
-    Mutex::Autolock lock(mRecordingLock);
+    mRecordingLock.lock();
     if (mRecordingEnabled) {
-        /*for (int i = 0; i < NB_BUFFER; i++) {
+        mRecordingEnabled = false;
+        for (int i = 0; i < NB_BUFFER; i++) {
             if (mRecordBufferState[i] != 0) {
-                mCamera->ReleaseRecordFrame(i);
+                mCamera->ReleaseFrame(i);
                 mRecordBufferState[i] = 0;
             }
-        }*/
-        mRecordingEnabled = false;
+        }
     }
-
-    mCamera->setCamMode(MODE_CAMERA);
+    mRecordingLock.unlock();
 
     // Release constraint to DSP OPP by setting lowest Hz
     SetDSPKHz(DSP3630_KHZ_MIN);
@@ -874,15 +885,17 @@ bool CameraHardware::recordingEnabled()
 
 void CameraHardware::releaseRecordingFrame(const void* opaque)
 {
-    buffersQueued--;
-    return;
-
     int i;
-    for (i = 0; i < NB_BUFFER; i++)
-        if ((void*)opaque == mRecordHeap[i]->data)
+    mRecordingLock.lock();
+    for (i = 0; i < NB_BUFFER; i++) {
+        if ((void*)opaque == (void*)mRecordHeap[i]->data && mRecordBufferState[i] == 1) {
+            mCamera->ReleaseFrame(i);
+            mRecordBufferState[i] = 0;
+            buffersQueued--;
             break;
-    mCamera->ReleaseRecordFrame(i);
-    //mRecordBufferState[i] = 0;
+        }
+    }
+    mRecordingLock.unlock();
 }
 
 // ---------------------------------------------------------------------------
@@ -1233,6 +1246,14 @@ status_t CameraHardware::setParameters(const CameraParameters& params)
     // scene mode
     const char *new_scene_mode_str = params.get(CameraParameters::KEY_SCENE_MODE);
     const char *current_scene_mode_str = mParameters.get(CameraParameters::KEY_SCENE_MODE);
+
+    // Recording Hint
+    const char *recordinghint = mParameters.get(CameraParameters::KEY_RECORDING_HINT);
+    if (!recordinghint || (recordinghint && (strcmp(recordinghint, CameraParameters::FALSE)))) {
+        mCamera->setCamMode(MODE_CAMCORDER);
+    } else {
+        mCamera->setCamMode(MODE_CAMERA);
+    }
 
     // fps range
     int new_min_fps = 0;

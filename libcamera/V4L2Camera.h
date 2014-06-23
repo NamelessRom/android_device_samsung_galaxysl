@@ -144,9 +144,8 @@ public:
 	int getCamMode(void);
 
 
-    void * GrabPreviewFrame (int& index);
-    void * GrabRecordFrame (int& index);
-    void ReleaseRecordFrame (int index);
+    void * GrabFrame (int& index);
+    void ReleaseFrame (int index);
     void GrabRawFrame(void *previewBuffer, unsigned int width, unsigned int height);
     void * GrabJpegFrame (int& mfilesize,bool IsFrontCam);
     void convert(unsigned char *buf, unsigned char *rgb, int width, int height);

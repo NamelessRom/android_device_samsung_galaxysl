@@ -174,6 +174,7 @@ private:
     preview_stream_ops_t*  mNativeWindow;
     camera_memory_t     *mRecordHeap[kBufferCount];
     camera_memory_t     *mPreviewHeap;
+    int mRecordBufferState[kBufferCount];
 
     // FFC preview resize
     camera_memory_t     *mScaleHeap;
