@@ -1,11 +1,7 @@
-lib/libOMX.TI.720P.Encoder.so
 lib/librotation.so
 lib/libsec-ril.so
 lib/libril.so
 lib/libsecril-client.so
-lib/libOMX.TI.720P.Decoder.so
-lib/libOMX.TI.h264.splt.Encoder.so
-lib/libOMX.TI.mp4.splt.Encoder.so
 lib/dsp/m4venc_sn.dll64P
 lib/dsp/wmadec_sn.dll64P
 lib/dsp/ittiam_divx3vdec_sn.dll64P
