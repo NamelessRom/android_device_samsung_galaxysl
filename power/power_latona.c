@@ -111,7 +111,7 @@ static void latona_power_set_interactive(struct power_module *module, int on)
     get_scaling_governor();
     if (strncmp(governor, "interactive", 11) == 0)
         sysfs_write(CPUFREQ_INTERACTIVE "timer_rate", on ? "30000" : "150000");
-    if (strncmp(governor, "ondemand", 11) == 0)
+    if (strncmp(governor, "ondemand", 8) == 0)
         sysfs_write(CPUFREQ_ONDEMAND "sampling_rate", on ? "60000" : "150000");
 }
 
