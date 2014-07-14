@@ -245,7 +245,10 @@ PRODUCT_PROPERTY_OVERRIDES += \
 
 # Low RAM Device
 PRODUCT_PROPERTY_OVERRIDES += \
-       ro.config.low_ram=true
+       ro.config.low_ram=true \
+       config.disable_atlas=true \
+       config.disable_dock=true
+
 
 # KSM
 PRODUCT_PROPERTY_OVERRIDES += \
