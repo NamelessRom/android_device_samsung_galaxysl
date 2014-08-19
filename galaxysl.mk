@@ -81,6 +81,10 @@ PRODUCT_COPY_FILES += \
     device/samsung/galaxysl/etc/media_profiles.xml:system/etc/media_profiles.xml \
     device/samsung/galaxysl/etc/media_codecs.xml:system/etc/media_codecs.xml
 
+# WIFI Configs
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/etc/wifi/p2p_supplicant_overlay.conf:system/etc/wifi/p2p_supplicant_overlay.conf
+
 #Bluetooth configuration files
 PRODUCT_COPY_FILES += \
     device/samsung/galaxysl/etc/bluetooth/main.conf:system/etc/bluetooth/main.conf
