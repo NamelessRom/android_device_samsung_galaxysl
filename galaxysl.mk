@@ -148,7 +148,8 @@ PRODUCT_PACKAGES += \
 # Audio
 PRODUCT_PACKAGES += \
 	libaudioutils audio.a2dp.default \
-	audio.primary.omap3 audio.usb.default
+	audio.primary.omap3 audio.usb.default \
+	audio.r_submix.default
 
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/libaudio/audio_policy.conf:system/etc/audio_policy.conf
