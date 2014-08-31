@@ -302,4 +302,4 @@ device/samsung/galaxysl/bml_over_mtd.sh:bml_over_mtd.sh
 # half of the device-specific product definition file takes care
 # of the aspects that require proprietary drivers that aren't
 # commonly available
-$(call inherit-product, vendor/samsung/galaxysl/galaxysl-vendor.mk)
+$(call inherit-product, vendor/samsung_own/galaxysl/galaxysl-vendor.mk)
