@@ -298,6 +298,9 @@ PRODUCT_COPY_FILES += \
 PRODUCT_COPY_FILES += \
 device/samsung/galaxysl/bml_over_mtd.sh:bml_over_mtd.sh
 
+# Enable Torch
+PRODUCT_PACKAGES += Torch
+
 # See comment at the top of this file. This is where the other
 # half of the device-specific product definition file takes care
 # of the aspects that require proprietary drivers that aren't
