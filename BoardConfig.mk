@@ -126,6 +126,10 @@ WIFI_FIRMWARE_LOADER := ""
 COMMON_GLOBAL_CFLAGS += -DUSES_TI_MAC80211
 endif
 
+# Torch
+We don't have a Flash LED
+USE_NO_TORCH := true
+
 TARGET_MODULES_SOURCE := "hardware/ti/wlan/mac80211/compat_wl12xx"
 
 WIFI_MODULES:
