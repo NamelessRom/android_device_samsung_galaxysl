@@ -16,5 +16,17 @@
         "repository": "NamelessRom/android_hardware_samsung",
         "target_path": "hardware/samsung",
         "revision": "n-2.0"
+    },
+    {
+        "remote": "github",
+        "repository": "CyanogenMod/android_hardware_ti_wlan",
+        "target_path": "hardware/ti/wlan",
+        "revision": "cm-12.0"
+    },
+    {
+        "remote": "github",
+        "repository": "CyanogenMod/android_hardware_ti_wpan",
+        "target_path": "hardware/ti/wpan",
+        "revision": "cm-12.0"
     }
 ]
