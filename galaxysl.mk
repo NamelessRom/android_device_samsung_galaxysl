@@ -125,7 +125,6 @@ PRODUCT_PACKAGES := \
     libbt-vendor \
     bootmenu_busybox \
     SamsungServiceMode \
-    hostapd.conf \
     DeviceParts
 
 # Charger
@@ -154,62 +153,24 @@ PRODUCT_PACKAGES += \
 PRODUCT_COPY_FILES += \
 	device/samsung/galaxysl/libaudio/audio_policy.conf:system/etc/audio_policy.conf
 
-# HWComposer
-PRODUCT_PACKAGES += hwcomposer.omap3
-
 #Camera
 PRODUCT_PACKAGES += camera.latona
 
 #Power
 PRODUCT_PACKAGES += power.latona
 
-# OMX stuff
-PRODUCT_PACKAGES += \
-    libstagefrighthw \
-    libbridge \
-    cexec.out \
-    libPERF \
-    libOMX_Core \
-    libLCML \
-    libion \
-    libtiutils \
-    libomap_mm_library_jni \
-    libOMX.TI.Video.Decoder \
-    libOMX.TI.Video.encoder \
-    libOMX.TI.WBAMR.decode \
-    libOMX.TI.AAC.encode \
-    libOMX.TI.G722.decode \
-    libOMX.TI.MP3.decode \
-    libOMX.TI.WMA.decode \
-    libOMX.TI.Video.encoder \
-    libOMX.TI.WBAMR.encode \
-    libOMX.TI.G729.encode \
-    libOMX.TI.AAC.decode \
-    libOMX.TI.VPP \
-    libOMX.TI.G711.encode \
-    libOMX.TI.JPEG.encoder \
-    libOMX.TI.G711.decode \
-    libOMX.TI.ILBC.decode \
-    libOMX.TI.ILBC.encode \
-    libOMX.TI.AMR.encode \
-    libOMX.TI.G722.encode \
-    libOMX.TI.JPEG.decoder \
-    libOMX.TI.G726.encode \
-    libOMX.TI.G729.decode \
-    libOMX.TI.Video.Decoder \
-    libOMX.TI.AMR.decode \
-    libOMX.TI.G726.decode
-
-#ITTIAM OMX
-PRODUCT_PACKAGES += \
-    libOMX.TI.720P.Decoder \
-    libOMX.TI.720P.Encoder
-
 # Script to edit the shipped nvs file to insert the device's assigned MAC
 # address
 PRODUCT_PACKAGES += store-mac-addr.sh
 
-# WIFI Firmwares
+# WIFI
+PRODUCT_PACKAGES += \
+    hostapd \
+    dhcpcd.conf \
+    libwpa_client \
+    wpa_supplicant \
+    wpa_supplicant.conf
+
 PRODUCT_PACKAGES += \
     wl127x-fw-4-sr.bin \
     wl127x-fw-4-mr.bin \
@@ -302,4 +263,5 @@ device/samsung/galaxysl/bml_over_mtd.sh:bml_over_mtd.sh
 # half of the device-specific product definition file takes care
 # of the aspects that require proprietary drivers that aren't
 # commonly available
+$(call inherit-product, hardware/ti/omap3/omap3.mk)
 $(call inherit-product, vendor/samsung/galaxysl/galaxysl-vendor.mk)

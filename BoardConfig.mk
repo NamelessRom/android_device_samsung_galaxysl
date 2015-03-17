@@ -38,6 +38,9 @@ TARGET_SPECIFIC_HEADER_PATH := device/samsung/galaxysl/include
 BOARD_CUSTOM_BOOTIMG_MK := device/samsung/galaxysl/shbootimg.mk
 TARGET_SYSTEMIMAGE_USE_SQUISHER := true
 
+# PIE
+TARGET_NEEDS_NON_PIE_SUPPORT := true
+
 # Inline kernel building config
 TARGET_KERNEL_CONFIG := latona_defconfig
 TARGET_KERNEL_SOURCE := kernel/samsung/latona
@@ -114,10 +117,11 @@ BOARD_HARDWARE_CLASS := device/samsung/galaxysl/cmhw
 USES_TI_MAC80211 := true
 ifdef USES_TI_MAC80211
 BOARD_WPA_SUPPLICANT_DRIVER := NL80211
-WPA_SUPPLICANT_VERSION := VER_0_8_X_TI
+WPA_SUPPLICANT_VERSION := VER_0_8_X
 BOARD_WIFI_SKIP_CAPABILITIES := true
 BOARD_WPA_SUPPLICANT_PRIVATE_LIB := lib_driver_cmd_wl12xx
 BOARD_HOSTAPD_DRIVER := NL80211
+BOARD_HOSTAPD_PRIVATE_LIB := lib_driver_cmd_wl12xx
 BOARD_WLAN_DEVICE := wl12xx_mac80211
 BOARD_SOFTAP_DEVICE := wl12xx_mac80211
 WIFI_DRIVER_MODULE_PATH := "/system/lib/modules/wl12xx_sdio.ko"
